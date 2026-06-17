@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 2048 - 4x4x4</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none; /* UI下のキャンバス操作を許可 */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 32px;
+            letter-spacing: 2px;
+        }
+        #score-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #f2b179;
+            margin-bottom: 20px;
+        }
+        .instruction-panel {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+            backdrop-filter: blur(4px);
+        }
+        .key {
+            display: inline-block;
+            background: #eee;
+            color: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 0 2px;
+        }
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.85);
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+            z-index: 10;
+        }
+        #game-over h2 { margin-top: 0; color: #f59563; font-size: 36px; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #8f7a66;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        button:hover { background-color: #9f8b77; }
+    </style>
+    <!-- Three.jsをES Moduleとして読み込むためのImport Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="ui-layer">
+        <h1>3D 2048</h1>
+        <div id="score-display">Score: <span id="score">0</span></div>
+        
+        <div class="instruction-panel">
+            <strong>[ブロックの移動]</strong><br>
+            <span class="key">A</span> <span class="key">D</span> : 左 / 右<br>
+            <span class="key">Q</span> <span class="key">E</span> : 下 / 上<br>
+            <span class="key">W</span> <span class="key">S</span> : 奥 / 手前<br><br>
+            <strong>[視点操作]</strong><br>
+            左ドラッグ : カメラ回転<br>
+            マウスホイール : ズーム
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h2>Game Over!</h2>
+        <p>Your Score: <span id="final-score">0</span></p>
+        <button id="retry-btn">Retry</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- ゲーム設定 ---
+        const SIZE = 4;
+        const CUBE_SIZE = 1;
+        const SPACING = 1.1; // ブロック間の隙間
+        const OFFSET = (SIZE - 1) * SPACING / 2;
+        let score = 0;
+        let board = []; // 3次元配列 [x][y][z]
+        let meshes = []; // 画面上の3Dオブジェクトの管理
+        let isAnimating = false;
+
+        // 2048の配色設定
+        const colors = {
+            2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563',
+            32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61',
+            512: '#edc850', 1024: '#edc53f', 2048: '#edc22e'
+        };
+        const textColors = { 2: '#776e65', 4: '#776e65' }; // 8以上は白文字
+
+        // --- Three.js 初期化 ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(8, 8, 12);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enablePan = false;
+        controls.target.set(0, 0, 0);
+
+        // 照明
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // --- 枠線（グリッド）の描画 ---
+        function createGridFrame() {
+            const frameGroup = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({ color: 0x555577, transparent: true, opacity: 0.3 });
+            
+            // 外枠と内部の点線などを描画して空間を把握しやすくする
+            const boxGeo = new THREE.BoxGeometry(SIZE * SPACING, SIZE * SPACING, SIZE * SPACING);
+            const edges = new THREE.EdgesGeometry(boxGeo);
+            const line = new THREE.LineSegments(edges, material);
+            frameGroup.add(line);
+
+            // 内部のドット（位置の目安）
+            const dotGeo = new THREE.SphereGeometry(0.05, 8, 8);
+            const dotMat = new THREE.MeshBasicMaterial({ color: 0x444466 });
+            for(let x=0; x<SIZE; x++) {
+                for(let y=0; y<SIZE; y++) {
+                    for(let z=0; z<SIZE; z++) {
+                        const dot = new THREE.Mesh(dotGeo, dotMat);
+                        const pos = getPosFromIndex(x, y, z);
+                        dot.position.copy(pos);
+                        frameGroup.add(dot);
+                    }
+                }
+            }
+            scene.add(frameGroup);
+        }
+
+        // --- 操作ガイド（空間上のラベルと軸）の描画 ---
+        function createLabelSprite(text, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            
+            // 半透明の円形背景
+            ctx.beginPath();
+            ctx.arc(64, 64, 56, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fill();
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+
+            // キー文字の描画
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 64px sans-serif';
+            ctx.fillText(text, 64, 64);
+
+            // Sprite（常にカメラの方を向く板ポリゴン）としてテクスチャを生成
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(1.2, 1.2, 1.2);
+            return sprite;
+        }
+
+        function createDirectionGuides() {
+            const dist = SIZE * SPACING * 0.65; // グリッドの少し外側に配置
+            
+            // X軸(赤系), Y軸(緑系), Z軸(青系)
+            const guides = [
+                { text: 'A', pos: [-dist, 0, 0], color: '#ff8888' }, // X- (左)
+                { text: 'D', pos: [dist, 0, 0], color: '#ff8888' },  // X+ (右)
+                { text: 'Q', pos: [0, -dist, 0], color: '#88ff88' }, // Y- (下)
+                { text: 'E', pos: [0, dist, 0], color: '#88ff88' },  // Y+ (上)
+                { text: 'W', pos: [0, 0, -dist], color: '#8888ff' }, // Z- (奥)
+                { text: 'S', pos: [0, 0, dist], color: '#8888ff' }   // Z+ (手前)
+            ];
+
+            guides.forEach(g => {
+                const sprite = createLabelSprite(g.text, g.color);
+                sprite.position.set(...g.pos);
+                scene.add(sprite);
+            });
+
+            // 中心を通る薄い軸線を描画
+            const axesGeo = new THREE.BufferGeometry();
+            const vertices = new Float32Array([
+                -dist, 0, 0,   dist, 0, 0,
+                0, -dist, 0,   0, dist, 0,
+                0, 0, -dist,   0, 0, dist
+            ]);
+            const colors = new Float32Array([
+                1, 0.5, 0.5,   1, 0.5, 0.5,
+                0.5, 1, 0.5,   0.5, 1, 0.5,
+                0.5, 0.5, 1,   0.5, 0.5, 1
+            ]);
+            axesGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+            axesGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const axesMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.3 });
+            const axesLines = new THREE.LineSegments(axesGeo, axesMat);
+            scene.add(axesLines);
+        }
+
+        // --- テクスチャ・マテリアル生成 ---
+        const materialCache = {};
+        
+        function getMaterialForValue(val) {
+            if (materialCache[val]) return materialCache[val];
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            // 背景色
+            ctx.fillStyle = colors[val] || '#3c3a32';
+            ctx.fillRect(0, 0, 256, 256);
+
+            // 角丸の枠線っぽくする
+            ctx.lineWidth = 10;
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.strokeRect(5, 5, 246, 246);
+
+            // テキスト描画
+            ctx.fillStyle = textColors[val] || '#f9f6f2';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // 桁数でフォントサイズ調整
+            let fontSize = 100;
+            if (val > 100) fontSize = 80;
+            if (val > 1000) fontSize = 60;
+            
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.fillText(val.toString(), 128, 128);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            const material = new THREE.MeshStandardMaterial({ 
+                map: texture,
+                roughness: 0.3,
+                metalness: 0.1
+            });
+            
+            materialCache[val] = material;
+            return material;
+        }
+
+        // --- ロジック＆座標計算 ---
+        function getPosFromIndex(x, y, z) {
+            return new THREE.Vector3(
+                x * SPACING - OFFSET,
+                y * SPACING - OFFSET,
+                z * SPACING - OFFSET
+            );
+        }
+
+        function initBoard() {
+            board = [];
+            for (let x = 0; x < SIZE; x++) {
+                board[x] = [];
+                for (let y = 0; y < SIZE; y++) {
+                    board[x][y] = [];
+                    for (let z = 0; z < SIZE; z++) {
+                        board[x][y][z] = 0;
+                    }
+                }
+            }
+            
+            // 既存のメッシュを削除
+            meshes.forEach(m => scene.remove(m));
+            meshes = [];
+            score = 0;
+            updateScore();
+            document.getElementById('game-over').style.display = 'none';
+
+            addRandomTile();
+            addRandomTile();
+            renderBoard();
+        }
+
+        function getEmptyCells() {
+            const empty = [];
+            for (let x = 0; x < SIZE; x++) {
+                for (let y = 0; y < SIZE; y++) {
+                    for (let z = 0; z < SIZE; z++) {
+                        if (board[x][y][z] === 0) empty.push({x, y, z});
+                    }
+                }
+            }
+            return empty;
+        }
+
+        function addRandomTile() {
+            const emptyCells = getEmptyCells();
+            if (emptyCells.length === 0) return;
+            const cell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            board[cell.x][cell.y][cell.z] = Math.random() < 0.9 ? 2 : 4;
+        }
+
+        // Three.jsシーンと論理ボードの同期
+        function renderBoard() {
+            // 削除されたメッシュをクリーンアップ
+            meshes.forEach(m => scene.remove(m));
+            meshes = [];
+
+            const geo = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
+
+            for (let x = 0; x < SIZE; x++) {
+                for (let y = 0; y < SIZE; y++) {
+                    for (let z = 0; z < SIZE; z++) {
+                        const val = board[x][y][z];
+                        if (val !== 0) {
+                            const mat = getMaterialForValue(val);
+                            const mesh = new THREE.Mesh(geo, mat);
+                            mesh.position.copy(getPosFromIndex(x, y, z));
+                            scene.add(mesh);
+                            meshes.push(mesh);
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- スライド処理ロジック ---
+        // 1列のスライド＆マージ処理 (2D版と同じロジック)
+        function slideAndMergeLine(line) {
+            let arr = line.filter(v => v !== 0); // 0を詰める
+            for (let i = 0; i < arr.length - 1; i++) {
+                if (arr[i] !== 0 && arr[i] === arr[i + 1]) {
+                    arr[i] *= 2;
+                    score += arr[i];
+                    arr.splice(i + 1, 1); // 結合した要素を消す
+                }
+            }
+            while (arr.length < SIZE) arr.push(0); // 末尾を0で埋める
+            return arr;
+        }
+
+        // 軸方向の移動
+        function moveBoard(axis, dir) {
+            let moved = false;
+            
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    let line = [];
+                    // 軸に応じて1列を抽出
+                    for (let k = 0; k < SIZE; k++) {
+                        if (axis === 'x') line.push(board[k][i][j]);
+                        if (axis === 'y') line.push(board[i][k][j]);
+                        if (axis === 'z') line.push(board[i][j][k]);
+                    }
+
+                    if (dir === 1) line.reverse(); // 正方向の移動の場合は反転して処理
+
+                    const newLine = slideAndMergeLine(line);
+
+                    if (dir === 1) newLine.reverse(); // 元に戻す
+
+                    // ボードに書き戻しつつ、変更があったかチェック
+                    for (let k = 0; k < SIZE; k++) {
+                        let currentVal;
+                        if (axis === 'x') currentVal = board[k][i][j];
+                        if (axis === 'y') currentVal = board[i][k][j];
+                        if (axis === 'z') currentVal = board[i][j][k];
+
+                        if (currentVal !== newLine[k]) moved = true;
+
+                        if (axis === 'x') board[k][i][j] = newLine[k];
+                        if (axis === 'y') board[i][k][j] = newLine[k];
+                        if (axis === 'z') board[i][j][k] = newLine[k];
+                    }
+                }
+            }
+            return moved;
+        }
+
+        function updateScore() {
+            document.getElementById('score').innerText = score;
+        }
+
+        function checkGameOver() {
+            if (getEmptyCells().length > 0) return false;
+            // 空きがない場合、隣接セルでマージ可能なものがあるかチェック
+            for (let x = 0; x < SIZE; x++) {
+                for (let y = 0; y < SIZE; y++) {
+                    for (let z = 0; z < SIZE; z++) {
+                        const val = board[x][y][z];
+                        if (x < SIZE - 1 && val === board[x + 1][y][z]) return false;
+                        if (y < SIZE - 1 && val === board[x][y + 1][z]) return false;
+                        if (z < SIZE - 1 && val === board[x][y][z + 1]) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        async function handleInput(axis, dir) {
+            if (isAnimating) return;
+            
+            const moved = moveBoard(axis, dir);
+            if (moved) {
+                isAnimating = true;
+                updateScore();
+                
+                // 本来は各ブロックの移動アニメーションを実装すべきですが、
+                // 3Dでの複雑さを避けるため、今回は即座に再描画し、少しフェードする表現にします。
+                renderBoard();
+                
+                // アニメーション待機（簡略化）
+                await new Promise(resolve => setTimeout(resolve, 150));
+                
+                addRandomTile();
+                renderBoard();
+
+                if (checkGameOver()) {
+                    document.getElementById('final-score').innerText = score;
+                    document.getElementById('game-over').style.display = 'block';
+                }
+                isAnimating = false;
+            }
+        }
+
+        // --- イベントリスナー ---
+        window.addEventListener('keydown', (e) => {
+            // ワールド座標軸に基づく移動 (カメラがどこを向いていてもキーと軸は固定)
+            switch (e.key.toLowerCase()) {
+                case 'a': handleInput('x', -1); break; // 左
+                case 'd': handleInput('x', 1);  break; // 右
+                case 'q': handleInput('y', -1); break; // 下
+                case 'e': handleInput('y', 1);  break; // 上
+                case 'w': handleInput('z', -1); break; // 奥
+                case 's': handleInput('z', 1);  break; // 手前
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        document.getElementById('retry-btn').addEventListener('click', () => {
+            initBoard();
+        });
+
+        // --- メインループ ---
+        createGridFrame();
+        createDirectionGuides(); // ガイド生成関数の呼び出しを追加
+        initBoard();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+    </script>
+</body>
+</html>
