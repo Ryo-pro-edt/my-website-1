@@ -1,135 +1,180 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SC  | Portfolio</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SC</title>
+    <style>
+        /* 全体のリセットと基本設定 */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            color: #000000;
+            /* あえてフォントをブラウザデフォルト（または明朝体）にしてレトロ感を演出 */
+            font-family: "MS PMincho", "MS Mincho", "ヒラギノ明朝 Pro W3", serif;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+
+        /* 画面を左右に分割するコンテナ（昔のフレーム構造をFlexboxで再現） */
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 左側：サイドナビゲーション */
+        .sidebar {
+            width: 200px;
+            min-width: 150px;
+            border-right: 2px solid #000000;
+            padding: 15px;
+            box-sizing: border-box;
+            background-color: #ffffff;
+        }
+
+        .sidebar ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar li {
+            margin-bottom: 12px;
+        }
+
+        /* ネット黎明期の標準的な未訪問・訪問済みのリンクカラー */
+        a {
+            color: #0000ff;
+            text-decoration: underline;
+        }
+        a:visited {
+            color: #800080;
+        }
+        a:hover {
+            color: #ff0000;
+        }
+
+        /* 右側：メインコンテンツ */
+        .main-content {
+            flex: 1;
+            padding: 20px 30px;
+            box-sizing: border-box;
+        }
+
+        /* タイトル部分 */
+        h1 {
+            font-size: 28px;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        /* プロフィール画像（実物はかなりサイズが最適化されています） */
+        .profile-img {
+            width: 250px;
+            height: auto;
+            border: 1px solid #000000;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        /* 区切り線 */
+        hr {
+            border: none;
+            border-top: 1px solid #000000;
+            margin: 20px 0;
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        /* お知らせなどのリスト */
+        .info-list {
+            padding-left: 20px;
+            margin-bottom: 20px;
+        }
+        .info-list li {
+            margin-bottom: 5px;
+        }
+
+        /* 古き良きシンプルなテーブル構造 */
+        .profile-table {
+            border-collapse: collapse;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+
+        .profile-table th, .profile-table td {
+            border: 1px solid #000000;
+            padding: 6px 10px;
+            text-align: left;
+        }
+
+        .profile-table th {
+            background-color: #e6e6e6;
+            width: 30%;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="#top" aria-label="トップへ">SC</a>
-    <nav class="nav" aria-label="メインナビゲーション">
-      <a href="#about">About</a>
-      <a href="#skills">Skills</a>
-      <a href="#works">Works</a>
-      <a href="#contact">Contact</a>
+
+<div class="container">
+    <!-- 左側メニュー -->
+    <nav class="sidebar">
+        <ul>
+            <li><a href="#">トップ</a></li>
+            <li><a href="#">Three.jsを使った作品</a></li>
+        </ul>
     </nav>
-    <button class="theme-toggle" type="button" aria-label="テーマを切り替える" data-theme-toggle>
-      <span aria-hidden="true">◐</span>
-    </button>
-  </header>
 
-  <main id="top">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="eyebrow">Hello, I am</p>
-        <h1 id="hero-title">SC</h1>
-        <p class="lead">
-          Web制作とプログラミングを学びながら、伝わりやすく使いやすい体験をつくることに取り組んでいます。
-        </p>
-        <div class="hero-actions">
-          <a class="button primary" href="#works">制作を見る</a>
-          <a class="button secondary" href="#contact">連絡する</a>
-        </div>
-      </div>
+    <!-- 右側メイン -->
+    <main class="main-content">
+        <h1>SC の ホームページ</h1>
+        
+        <!-- 画像プレースホルダー（実際の画像に差し替えてください） -->
+        <img src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="本人の写真" class="profile-img">
+        
+        <hr>
+        
+        <h2>最新情報</h2>
+        <ul class="info-list">
+            <li>Kaggle-Orbitwarsに参加中</li>
+            <li></li>
+        </ul>
 
-      <div class="profile-visual" aria-label="プロフィールビジュアル">
-        <div class="portrait">
-          <span>R</span>
-        </div>
-        <dl class="quick-facts">
-          <div>
-            <dt>Focus</dt>
-            <dd>HTML / CSS / JavaScript</dd>
-          </div>
-          <div>
-            <dt>Style</dt>
-            <dd>丁寧に考え、まず動く形へ</dd>
-          </div>
-        </dl>
-      </div>
-    </section>
+        <hr>
 
-    <section class="section intro-band" id="about" aria-labelledby="about-title">
-      <div class="section-heading">
-        <p class="eyebrow">About</p>
-        <h2 id="about-title">自己紹介</h2>
-      </div>
-      <div class="about-grid">
-        <p>
-          こんにちは、SCです。新しい技術を試しながら、見た目の気持ちよさと操作のわかりやすさを両立するWebサイトづくりを目指しています。
-        </p>
-        <p>
-          学習では小さな改善を積み重ねることを大切にしています。コードを書くだけでなく、使う人が迷わず目的に進めることを意識しています。
-        </p>
-      </div>
-    </section>
+        <h2>プロフィール</h2>
+        <table class="profile-table">
+            <tr>
+                <th>生年月日</th>
+                <td>????年11月17日</td>
+            </tr>
+            <tr>
+                <th>血液型</th>
+                <td>A型</td>
+            </tr>
+            <tr>
+                <th>サイズ</th>
+                <td>身長 ???cm</td>
+            </tr>
+            <tr>
+                <th>趣味</th>
+                <td>色々</td>
+            </tr>
+        </table>
 
-    <section class="section" id="skills" aria-labelledby="skills-title">
-      <div class="section-heading">
-        <p class="eyebrow">Skills</p>
-        <h2 id="skills-title">できること</h2>
-      </div>
-      <div class="skill-list">
-        <article class="skill-card">
-          <span class="skill-icon" aria-hidden="true">HTML</span>
-          <h3>構造設計</h3>
-          <p>読みやすく、後から直しやすいHTMLを意識してページを組み立てます。</p>
-        </article>
-        <article class="skill-card">
-          <span class="skill-icon" aria-hidden="true">CSS</span>
-          <h3>レスポンシブデザイン</h3>
-          <p>スマートフォンからPCまで、見やすく崩れにくいレイアウトを作ります。</p>
-        </article>
-        <article class="skill-card">
-          <span class="skill-icon" aria-hidden="true">JS</span>
-          <h3>インタラクション</h3>
-          <p>テーマ切り替えやスクロール演出など、ページに自然な動きを加えます。</p>
-        </article>
-      </div>
-    </section>
+        <hr>
+        
+        <p>Respect 阿部寛</p>
+    </main>
+</div>
 
-    <section class="section works-band" id="works" aria-labelledby="works-title">
-      <div class="section-heading">
-        <p class="eyebrow">Works</p>
-        <h2 id="works-title">制作例</h2>
-      </div>
-      <div class="works-grid">
-        <article class="work-item">
-          <div class="work-thumb thumb-a" aria-hidden="true"></div>
-          <h3>自己紹介ページ</h3>
-          <p>プロフィール、スキル、連絡先を1ページで見やすくまとめたサイトです。</p>
-        </article>
-        <article class="work-item">
-          <div class="work-thumb thumb-b" aria-hidden="true"></div>
-          <h3>学習メモサイト</h3>
-          <p>日々の学びを整理し、後から探しやすくするためのシンプルなページです。</p>
-        </article>
-        <article class="work-item">
-          <div class="work-thumb thumb-c" aria-hidden="true"></div>
-          <h3>ミニアプリ</h3>
-          <p>JavaScriptで操作できる小さな便利ツールを制作する想定の枠です。</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="section contact" id="contact" aria-labelledby="contact-title">
-      <div class="section-heading">
-        <p class="eyebrow">Contact</p>
-        <h2 id="contact-title">連絡先</h2>
-      </div>
-      <p>プロフィール文やリンクは自由に変更できます。SNS、GitHub、メールアドレスなどを追加してください。</p>
-      <div class="contact-links">
-        <a href="mailto:hello@example.com">Mail</a>
-        <a href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
-        <a href="https://x.com/" target="_blank" rel="noreferrer">X</a>
-      </div>
-    </section>
-  </main>
-
-  <button class="back-to-top" type="button" aria-label="ページ上部へ戻る" data-back-to-top>↑</button>
-
-  <script src="script.js"></script>
 </body>
 </html>
