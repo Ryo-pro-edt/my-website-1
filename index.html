@@ -3,34 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SC</title>
+    <title>SC - Atmospheric Glass</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* 全体のリセットと基本設定 */
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #f0f0f0;
-            color: #000000;
-            /* あえてフォントをブラウザデフォルト（または明朝体）にしてレトロ感を演出 */
-            font-family: "MS PMincho", "MS Mincho", "ヒラギノ明朝 Pro W3", serif;
-            font-size: 16px;
-            line-height: 1.4;
+        /* =========================================
+           Design System: Atmospheric Glass
+           ========================================= */
+        :root {
+            /* Colors */
+            --primary: #ffffff;
+            --on-surface: #dae2fd;
+            --on-surface-variant: #c4c7c8;
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-border-subtle: rgba(255, 255, 255, 0.1);
+            
+            /* Spacing & Rounded */
+            --spacing-unit: 8px;
+            --rounded-md: 0.75rem;
+            --rounded-lg: 1rem;
+            --rounded-xl: 1.5rem;
         }
 
-        /* 画面を左右に分割するコンテナ（昔のフレーム構造をFlexboxで再現） */
+        /* 全体のリセットと背景設定 */
+        body {
+            margin: 0;
+            padding: 24px;
+            /* 鮮やかなマルチストップグラデーション（Deep Blue, Vivid Purple, Soft Pink） */
+            background: linear-gradient(135deg, #1E3A8A 0%, #7E22CE 50%, #DB2777 100%);
+            background-attachment: fixed;
+            color: var(--primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            box-sizing: border-box;
+            line-height: 1.5;
+        }
+
+        /* 浮遊感を持たせたレイアウト構造 */
         .container {
             display: flex;
-            min-height: 100vh;
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-wrap: wrap; /* モバイル対応 */
+        }
+
+        /* Glassmorphism 共通ミックスイン (Level 2: Standard) */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.3); /* 光の屈折（インナーシャイン）をシミュレート */
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+            border-radius: var(--rounded-lg);
+        }
+
+        /* Glassmorphism 共通ミックスイン (Level 3: Elevated) */
+        .glass-panel-elevated {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.15);
+            border-radius: var(--rounded-xl);
         }
 
         /* 左側：サイドナビゲーション */
         .sidebar {
-            width: 200px;
-            min-width: 150px;
-            border-right: 2px solid #000000;
-            padding: 15px;
-            box-sizing: border-box;
-            background-color: #ffffff;
+            width: 250px;
+            padding: 20px;
+            flex-shrink: 0;
+            height: fit-content;
         }
 
         .sidebar ul {
@@ -40,104 +88,140 @@
         }
 
         .sidebar li {
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
 
-        /* ネット黎明期の標準的な未訪問・訪問済みのリンクカラー */
-        a {
-            color: #0000ff;
-            text-decoration: underline;
+        /* インタラクティブリストアイテム */
+        .sidebar a {
+            display: block;
+            color: var(--primary);
+            text-decoration: none;
+            padding: 12px;
+            border-radius: var(--rounded-md);
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.15);
         }
-        a:visited {
-            color: #800080;
-        }
-        a:hover {
-            color: #ff0000;
+
+        .sidebar a:hover {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px);
         }
 
         /* 右側：メインコンテンツ */
         .main-content {
             flex: 1;
-            padding: 20px 30px;
-            box-sizing: border-box;
+            padding: 40px;
+            min-width: 300px;
         }
 
-        /* タイトル部分 */
+        /* タイポグラフィ */
         h1 {
-            font-size: 28px;
-            font-weight: bold;
+            font-size: 32px;
+            font-weight: 600;
+            line-height: 40px;
+            letter-spacing: -0.02em;
             margin-top: 0;
-            margin-bottom: 20px;
-        }
-
-        /* プロフィール画像（実物はかなりサイズが最適化されています） */
-        .profile-img {
-            width: 250px;
-            height: auto;
-            border: 1px solid #000000;
-            margin-bottom: 20px;
-            display: block;
-        }
-
-        /* 区切り線 */
-        hr {
-            border: none;
-            border-top: 1px solid #000000;
-            margin: 20px 0;
+            margin-bottom: 24px;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.15);
         }
 
         h2 {
-            font-size: 20px;
-            margin-top: 20px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 500;
+            line-height: 32px;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.15);
         }
 
-        /* お知らせなどのリスト */
+        /* プロフィール画像 */
+        .profile-img {
+            width: 200px;
+            height: auto;
+            border-radius: var(--rounded-lg);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+            margin-bottom: 24px;
+            display: block;
+        }
+
+        /* 区切り線（すりガラスに合う繊細なライン） */
+        hr {
+            border: none;
+            border-top: 1px solid var(--glass-border);
+            margin: 32px 0;
+        }
+
+        /* リスト */
         .info-list {
-            padding-left: 20px;
-            margin-bottom: 20px;
+            padding-left: 24px;
+            color: var(--on-surface);
+            font-size: 18px;
         }
         .info-list li {
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
 
-        /* 古き良きシンプルなテーブル構造 */
+        /* プロフィールテーブル（モダンなGlass仕様） */
         .profile-table {
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             width: 100%;
             max-width: 500px;
-            margin-bottom: 20px;
+            border-radius: var(--rounded-md);
+            overflow: hidden;
+            border: 1px solid var(--glass-border-subtle);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .profile-table th, .profile-table td {
-            border: 1px solid #000000;
-            padding: 6px 10px;
+            padding: 16px;
             text-align: left;
+            border-bottom: 1px solid var(--glass-border-subtle);
+        }
+
+        .profile-table tr:last-child th,
+        .profile-table tr:last-child td {
+            border-bottom: none;
         }
 
         .profile-table th {
-            background-color: #e6e6e6;
             width: 30%;
-            font-weight: bold;
+            font-weight: 500;
+            color: var(--primary);
+            background: rgba(255, 255, 255, 0.08); /* わずかに目立たせる */
+        }
+
+        .profile-table td {
+            color: var(--on-surface-variant);
+            font-weight: 400;
+        }
+
+        /* label-sm typography */
+        .respect-text {
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            color: var(--on-surface-variant);
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- 左側メニュー -->
-    <nav class="sidebar">
+    <nav class="sidebar glass-panel">
         <ul>
             <li><a href="#">トップ</a></li>
             <li><a href="threegames/3d_2048.html">Three.jsを使った作品</a></li>
         </ul>
     </nav>
 
-    <!-- 右側メイン -->
-    <main class="main-content">
+    <main class="main-content glass-panel-elevated">
         <h1>SC の ホームページ</h1>
         
-        <!-- 画像プレースホルダー（実際の画像に差し替えてください） -->
         <img src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="本人の写真" class="profile-img">
         
         <hr>
@@ -145,7 +229,6 @@
         <h2>最新情報</h2>
         <ul class="info-list">
             <li>Kaggle-Orbitwarsに参加中</li>
-            <li></li>
         </ul>
 
         <hr>
@@ -172,7 +255,7 @@
 
         <hr>
         
-        <p>Respect 阿部寛</p>
+        <p class="respect-text">Respect 阿部寛</p>
     </main>
 </div>
 
