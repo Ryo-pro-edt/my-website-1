@@ -3,215 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Ryo のプロフィールと制作物を紹介するページ">
-    <title>Ryo | Profile</title>
+    <meta name="description" content="Ryoのプロフィールと制作物を紹介するSNS風ページ">
+    <title>Ryo / ホーム</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #f4f7fb;
-            --surface: rgba(255, 255, 255, 0.88);
-            --surface-strong: #ffffff;
-            --text: #182235;
-            --muted: #718096;
-            --line: #e6ebf2;
-            --accent: #5271ff;
-            --accent-dark: #3855d4;
-            --accent-soft: #edf1ff;
-            --shadow: 0 20px 55px rgba(55, 78, 120, 0.12);
-            --radius-lg: 24px;
-            --radius-md: 16px;
+            --blue: #1d9bf0;
+            --blue-soft: #e8f5fd;
+            --ink: #0f1419;
+            --muted: #536471;
+            --line: #eff3f4;
+            --surface: #ffffff;
+            --sidebar: 250px;
+            --feed: 680px;
         }
 
         * { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
+        body { margin: 0; color: var(--ink); background: var(--surface); font-family: Inter, "Noto Sans JP", sans-serif; line-height: 1.5; }
+        a { color: inherit; text-decoration: none; }
+        button { font: inherit; }
 
-        body {
-            margin: 0;
-            color: var(--text);
-            font-family: "Inter", "Noto Sans JP", sans-serif;
-            background:
-                radial-gradient(circle at 10% 0%, rgba(130, 153, 255, 0.22), transparent 34%),
-                radial-gradient(circle at 100% 20%, rgba(255, 190, 214, 0.24), transparent 32%),
-                var(--bg);
-            line-height: 1.7;
+        .app-shell { display: grid; grid-template-columns: var(--sidebar) minmax(0, var(--feed)) minmax(220px, 1fr); justify-content: center; min-height: 100vh; }
+
+        .sidebar { position: sticky; top: 0; height: 100vh; padding: 8px 18px 16px 12px; border-right: 1px solid var(--line); }
+        .logo { display: grid; width: 48px; height: 48px; margin-bottom: 10px; place-items: center; border-radius: 50%; font-family: Georgia, serif; font-size: 2.3rem; line-height: 1; }
+        .logo:hover { background: var(--blue-soft); }
+        .side-nav { display: grid; gap: 4px; }
+        .side-nav a { display: flex; align-items: center; gap: 17px; padding: 10px 14px; border-radius: 999px; font-size: 1.08rem; transition: background 0.2s ease; }
+        .side-nav a:hover, .side-nav a:focus-visible { background: #f2f2f2; outline: none; }
+        .side-nav a.active { font-weight: 800; }
+        .nav-icon { display: grid; width: 28px; place-items: center; font-size: 1.5rem; line-height: 1; }
+        .post-button { width: 100%; margin-top: 14px; padding: 13px 20px; border: 0; border-radius: 999px; color: #fff; background: var(--ink); font-weight: 800; cursor: pointer; transition: background 0.2s ease, transform 0.2s ease; }
+        .post-button:hover { background: #27313a; transform: translateY(-1px); }
+        .account { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 12px 10px; border-radius: 999px; }
+        .account:hover { background: #f2f2f2; }
+        .account-avatar { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
+        .account-name { min-width: 0; flex: 1; }
+        .account-name strong, .account-name span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .account-name strong { font-size: 0.88rem; }
+        .account-name span { color: var(--muted); font-size: 0.8rem; }
+        .more { color: var(--muted); font-weight: 800; }
+
+        .feed { border-right: 1px solid var(--line); }
+        .feed-header { position: sticky; top: 0; z-index: 5; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(12px); }
+        .feed-title { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 8px; }
+        .feed-title h1 { margin: 0; font-size: 1.25rem; }
+        .feed-title span { color: var(--muted); font-size: 1.25rem; }
+        .feed-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
+        .feed-tabs a { position: relative; padding: 14px 8px; color: var(--muted); font-size: 0.92rem; font-weight: 600; text-align: center; }
+        .feed-tabs a:hover, .feed-tabs a:focus-visible { background: #f7f9f9; outline: none; }
+        .feed-tabs a.active { color: var(--ink); font-weight: 800; }
+        .feed-tabs a.active::after { position: absolute; right: 34%; bottom: -1px; left: 34%; height: 4px; border-radius: 4px 4px 0 0; background: var(--blue); content: ""; }
+
+        .composer { display: flex; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+        .composer-avatar { width: 42px; height: 42px; object-fit: cover; border-radius: 50%; }
+        .composer-body { flex: 1; }
+        .composer-input { padding: 8px 0 18px; color: var(--muted); font-size: 1.05rem; }
+        .composer-footer { display: flex; align-items: center; justify-content: space-between; }
+        .composer-tools { display: flex; gap: 12px; color: var(--blue); }
+        .composer-tools span { font-size: 1.05rem; }
+        .composer-button { padding: 8px 16px; border: 0; border-radius: 999px; color: #fff; background: var(--blue); font-size: 0.86rem; font-weight: 800; }
+
+        .post-card { display: flex; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); transition: background 0.2s ease; }
+        .post-card:hover { background: #fafafa; }
+        .post-avatar { width: 42px; height: 42px; flex: 0 0 42px; object-fit: cover; border-radius: 50%; }
+        .post-main { min-width: 0; flex: 1; }
+        .post-meta { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 0.88rem; }
+        .post-meta strong { color: var(--ink); font-size: 0.94rem; }
+        .post-meta .verified { color: var(--blue); font-size: 0.8rem; }
+        .post-menu { margin-left: auto; color: var(--muted); }
+        .post-text { margin: 2px 0 12px; font-size: 0.98rem; white-space: pre-line; }
+        .post-text a { color: var(--blue); }
+        .post-link { display: block; padding: 14px; border: 1px solid #cfd9de; border-radius: 16px; transition: background 0.2s ease; }
+        .post-link:hover { background: #f7fbfd; }
+        .post-link strong { display: block; margin-bottom: 2px; }
+        .post-link span { color: var(--muted); font-size: 0.85rem; }
+        .post-actions { display: flex; justify-content: space-between; max-width: 500px; padding-top: 2px; color: var(--muted); font-size: 0.82rem; }
+        .post-actions a { display: inline-flex; align-items: center; gap: 5px; }
+        .post-actions a:hover { color: var(--blue); }
+
+        .right-rail { padding: 12px 20px; }
+        .search-box { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; background: #eff3f4; color: var(--muted); }
+        .search-box input { width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font: inherit; }
+        .rail-card { margin-top: 18px; padding: 16px; border-radius: 16px; background: #f7f9f9; }
+        .rail-card h2 { margin: 0 0 14px; font-size: 1.1rem; }
+        .rail-card p { margin: 0 0 14px; color: var(--muted); font-size: 0.86rem; }
+        .rail-link { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #e2e8ea; font-size: 0.9rem; font-weight: 700; }
+        .rail-link:first-of-type { border-top: 0; }
+        .rail-link:hover { color: var(--blue); }
+        .rail-link span { color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+
+        @media (max-width: 1040px) {
+            .app-shell { grid-template-columns: 82px minmax(0, var(--feed)) minmax(180px, 1fr); }
+            .sidebar { padding-right: 10px; padding-left: 10px; }
+            .side-nav a { justify-content: center; padding: 11px; }
+            .side-nav a span:not(.nav-icon), .post-button { display: none; }
+            .account-name, .account .more { display: none; }
+            .account { justify-content: center; }
         }
 
-        a { color: inherit; }
-
-        .site-shell { width: min(100% - 32px, 980px); margin: 0 auto; padding: 24px 0 56px; }
-
-        .topbar {
-            position: sticky;
-            top: 16px;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-            margin-bottom: 24px;
-            padding: 10px 12px 10px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.9);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.8);
-            box-shadow: 0 12px 32px rgba(55, 78, 120, 0.1);
-            backdrop-filter: blur(16px);
+        @media (max-width: 760px) {
+            .app-shell { display: block; }
+            .sidebar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; height: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); }
+            .logo { width: 40px; height: 40px; margin: 0 8px 0 0; }
+            .side-nav { display: flex; flex: 1; justify-content: space-around; }
+            .side-nav a { padding: 8px; }
+            .account { display: none; }
+            .right-rail { display: none; }
+            .feed { border-right: 0; }
+            .feed-title { padding-top: 12px; }
         }
 
-        .brand { color: var(--text); font-size: 1rem; font-weight: 800; letter-spacing: 0.08em; text-decoration: none; }
-
-        .tabs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; list-style: none; }
-
-        .tabs a {
-            display: block;
-            padding: 8px 14px;
-            border-radius: 999px;
-            color: var(--muted);
-            font-size: 0.86rem;
-            font-weight: 700;
-            text-decoration: none;
-            transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
-        }
-
-        .tabs a:hover,
-        .tabs a:focus-visible,
-        .tabs a[aria-current="page"] {
-            color: var(--accent-dark);
-            background: var(--accent-soft);
-            outline: none;
-        }
-
-        .tabs a:hover { transform: translateY(-1px); }
-
-        .profile-card {
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.9);
-            border-radius: var(--radius-lg);
-            background: var(--surface);
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(14px);
-        }
-
-        .cover { position: relative; height: 220px; overflow: hidden; background: linear-gradient(120deg, #243b9f, #6b55df 52%, #ed78a5); }
-        .cover::before, .cover::after { position: absolute; border-radius: 50%; content: ""; background: rgba(255, 255, 255, 0.17); }
-        .cover::before { width: 320px; height: 320px; right: -70px; top: -170px; }
-        .cover::after { width: 240px; height: 240px; left: 15%; bottom: -190px; }
-
-        .profile-content { padding: 0 48px 48px; }
-
-        .profile-header { display: flex; align-items: flex-end; gap: 24px; margin-top: -66px; position: relative; }
-
-        .avatar {
-            width: 132px;
-            height: 132px;
-            flex: 0 0 132px;
-            object-fit: cover;
-            border: 6px solid var(--surface-strong);
-            border-radius: 50%;
-            background: #dde4ff;
-            box-shadow: 0 10px 28px rgba(43, 57, 100, 0.22);
-        }
-
-        .profile-heading { padding-bottom: 8px; }
-        .profile-heading h1 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.2; letter-spacing: -0.04em; }
-        .handle { margin: 6px 0 0; color: var(--muted); font-size: 0.95rem; }
-        .intro { max-width: 620px; margin: 26px 0 0; color: #44526a; font-size: 1.03rem; }
-        .profile-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 14px 0 0; color: var(--muted); font-size: 0.88rem; }
-        .profile-meta span { display: inline-flex; align-items: center; gap: 6px; }
-
-        .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 28px 0; }
-        .stat { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: rgba(248, 250, 255, 0.82); text-align: center; }
-        .stat strong { display: block; font-size: 1.3rem; line-height: 1.3; }
-        .stat span { color: var(--muted); font-size: 0.78rem; }
-
-        .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 36px 0 14px; }
-        .section-heading h2 { margin: 0; font-size: 1.1rem; }
-        .section-heading p { margin: 0; color: var(--muted); font-size: 0.8rem; }
-
-        .activity-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-        .activity { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-strong); }
-        .activity-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border-radius: 12px; color: var(--accent-dark); background: var(--accent-soft); font-size: 1.1rem; }
-        .activity strong { display: block; font-size: 0.92rem; }
-        .activity p { margin: 3px 0 0; color: var(--muted); font-size: 0.84rem; }
-
-        .works { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-
-        .work-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-strong); text-decoration: none; transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
-        .work-card:hover, .work-card:focus-visible { border-color: #bdc8ff; box-shadow: 0 10px 24px rgba(82, 113, 255, 0.1); outline: none; transform: translateY(-2px); }
-        .work-card strong { display: block; font-size: 0.92rem; }
-        .work-card span { color: var(--muted); font-size: 0.78rem; }
-        .arrow { color: var(--accent) !important; font-size: 1.2rem !important; }
-
-        footer { padding-top: 28px; color: var(--muted); font-size: 0.78rem; text-align: center; }
-
-        @media (max-width: 680px) {
-            .site-shell { width: min(100% - 20px, 560px); padding-top: 10px; }
-            .topbar { top: 8px; align-items: flex-start; flex-direction: column; gap: 8px; border-radius: 20px; padding: 12px; }
-            .tabs { justify-content: flex-start; width: 100%; }
-            .tabs a { padding: 7px 10px; font-size: 0.78rem; }
-            .cover { height: 150px; }
-            .profile-content { padding: 0 20px 28px; }
-            .profile-header { align-items: flex-start; flex-direction: column; gap: 12px; margin-top: -48px; }
-            .avatar { width: 104px; height: 104px; flex-basis: 104px; }
-            .stats { gap: 8px; }
-            .stat { padding: 12px 8px; }
-            .stat strong { font-size: 1.05rem; }
-            .works { grid-template-columns: 1fr; }
+        @media (max-width: 480px) {
+            .side-nav a:nth-child(n+4) { display: none; }
+            .post-card, .composer { padding-right: 12px; padding-left: 12px; }
+            .feed-tabs a { font-size: 0.78rem; }
+            .post-actions { font-size: 0.75rem; }
         }
     </style>
 </head>
 <body>
-    <div class="site-shell">
-        <nav class="topbar" aria-label="メインナビゲーション">
-            <a class="brand" href="index.html">RYO / PROFILE</a>
-            <ul class="tabs">
-                <li><a href="index.html" aria-current="page" aria-label="プロフィールタブ">プロフィール</a></li>
-                <li><a href="threegames/3d_2048.html">Threegames</a></li>
-                <li><a href="other/index.html">Other</a></li>
-            </ul>
-        </nav>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <a class="logo" href="index.html" aria-label="ホーム">𝕏</a>
+            <nav class="side-nav" aria-label="サイドナビゲーション">
+                <a class="active" href="index.html"><span class="nav-icon">⌂</span><span>ホーム</span></a>
+                <a href="#search"><span class="nav-icon">⌕</span><span>話題を検索</span></a>
+                <a href="#notifications"><span class="nav-icon">♧</span><span>通知</span></a>
+                <a href="#chat"><span class="nav-icon">◯</span><span>チャット</span></a>
+                <a href="#history"><span class="nav-icon">◒</span><span>履歴</span></a>
+                <a href="#profile"><span class="nav-icon">♙</span><span>プロフィール</span></a>
+                <a href="#more"><span class="nav-icon">•••</span><span>もっと見る</span></a>
+            </nav>
+            <button class="post-button" type="button">ポストする</button>
+            <a class="account" href="#profile">
+                <img class="account-avatar" src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="Ryoのプロフィール画像">
+                <span class="account-name"><strong>Ryo</strong><span>@ryo-pro-edt</span></span>
+                <span class="more" aria-hidden="true">•••</span>
+            </a>
+        </aside>
 
-        <main class="profile-card">
-            <div class="cover" aria-hidden="true"></div>
-            <div class="profile-content">
-                <header class="profile-header">
-                    <img class="avatar" src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="Ryoのプロフィール画像">
-                    <div class="profile-heading">
-                        <h1>Ryo</h1>
-                        <p class="handle">@ryo-pro-edt</p>
-                    </div>
-                </header>
+        <main class="feed">
+            <header class="feed-header">
+                <div class="feed-title"><h1>ホーム</h1><span aria-hidden="true">⚙</span></div>
+                <nav class="feed-tabs" aria-label="タイムラインタブ">
+                    <a class="active" href="#recommended">おすすめ</a>
+                    <a href="#following">フォロー中</a>
+                    <a href="#machine-learning">Machine Learning</a>
+                </nav>
+            </header>
 
-                <p class="intro">Web制作とゲーム制作を楽しみながら、気になったアイデアを形にしています。ここではプロフィールと最近の制作物を紹介しています。</p>
-                <div class="profile-meta" aria-label="プロフィール情報">
-                    <span>📍 Japan</span><span>🛠️ Web / Game</span><span>📅 Joined 2025</span>
+            <section class="composer" aria-label="新しいポスト">
+                <img class="composer-avatar" src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="">
+                <div class="composer-body">
+                    <div class="composer-input">いまどうしてる？</div>
+                    <div class="composer-footer"><div class="composer-tools" aria-hidden="true"><span>▧</span><span>☺</span><span>⌖</span></div><button class="composer-button" type="button">ポスト</button></div>
                 </div>
+            </section>
 
-                <div class="stats" aria-label="プロフィール統計">
-                    <div class="stat"><strong>3</strong><span>Projects</span></div>
-                    <div class="stat"><strong>2</strong><span>Interests</span></div>
-                    <div class="stat"><strong>∞</strong><span>Ideas</span></div>
+            <article class="post-card" id="recommended">
+                <img class="post-avatar" src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="Ryoのプロフィール画像">
+                <div class="post-main">
+                    <div class="post-meta"><strong>Ryo</strong><span class="verified">●</span><span>@ryo-pro-edt · 2時間</span><span class="post-menu">•••</span></div>
+                    <p class="post-text">プロフィールページを、SNSのタイムライン風デザインにリニューアルしました。
+白をベースに、青いアクセントと見やすいカードで制作物をまとめています。</p>
+                    <a class="post-link" href="threegames/3d_2048.html"><strong>🎮 Threegames / 3D 2048</strong><span>ブラウザで遊べる作品を見てみる</span></a>
+                    <div class="post-actions"><a href="#reply">◯ 8</a><a href="#repost">↻ 4</a><a href="#like">♡ 26</a><a href="#views">▥ 1,204</a><a href="#bookmark">♧</a></div>
                 </div>
+            </article>
 
-                <section aria-labelledby="activity-title">
-                    <div class="section-heading"><h2 id="activity-title">最近のアクティビティ</h2><p>Latest updates</p></div>
-                    <ul class="activity-list">
-                        <li class="activity"><span class="activity-icon" aria-hidden="true">🎮</span><div><strong>Threegames に作品を公開</strong><p>ブラウザで遊べる 3D 2048 を制作しました。</p></div></li>
-                        <li class="activity"><span class="activity-icon" aria-hidden="true">📊</span><div><strong>Kaggle に挑戦中</strong><p>Kaggle - Orbitwars の分析を進めています。</p></div></li>
-                    </ul>
-                </section>
+            <article class="post-card" id="machine-learning">
+                <img class="post-avatar" src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="Ryoのプロフィール画像">
+                <div class="post-main">
+                    <div class="post-meta"><strong>Ryo</strong><span class="verified">●</span><span>@ryo-pro-edt · 1日前</span><span class="post-menu">•••</span></div>
+                    <p class="post-text">Kaggle - Orbitwars の分析を進めています。
+データを眺めながら、仮説を少しずつ検証していく時間が好きです。</p>
+                    <div class="post-actions"><a href="#reply">◯ 4</a><a href="#repost">↻ 2</a><a href="#like">♡ 18</a><a href="#views">▥ 640</a><a href="#bookmark">♧</a></div>
+                </div>
+            </article>
 
-                <section aria-labelledby="works-title">
-                    <div class="section-heading"><h2 id="works-title">制作物・リンク</h2><p>Explore my work</p></div>
-                    <div class="works">
-                        <a class="work-card" href="threegames/3d_2048.html"><span><strong>3D 2048</strong><span>Threegames の作品を見る</span></span><span class="arrow" aria-hidden="true">↗</span></a>
-                        <a class="work-card" href="other/index.html"><span><strong>Other works</strong><span>その他の HTML ページを見る</span></span><span class="arrow" aria-hidden="true">↗</span></a>
-                    </div>
-                </section>
-            </div>
+            <article class="post-card" id="following">
+                <img class="post-avatar" src="https://avatars.githubusercontent.com/u/188586823?s=400&u=024877f8ab0cbc08a61bb6c4650aa7b60b371992&v=4" alt="Ryoのプロフィール画像">
+                <div class="post-main">
+                    <div class="post-meta"><strong>Ryo</strong><span class="verified">●</span><span>@ryo-pro-edt · 3日前</span><span class="post-menu">•••</span></div>
+                    <p class="post-text">Other works のページも準備しました。これから作った HTML ページを少しずつ追加していきます。</p>
+                    <a class="post-link" href="other/index.html"><strong>✦ Other works</strong><span>その他の HTML ページを見る</span></a>
+                    <div class="post-actions"><a href="#reply">◯ 6</a><a href="#repost">↻ 3</a><a href="#like">♡ 31</a><a href="#views">▥ 912</a><a href="#bookmark">♧</a></div>
+                </div>
+            </article>
         </main>
-        <footer>© 2026 Ryo · Built with curiosity</footer>
+
+        <aside class="right-rail">
+            <label class="search-box" id="search"><span aria-hidden="true">⌕</span><input type="search" placeholder="検索" aria-label="検索"></label>
+            <section class="rail-card" id="profile">
+                <h2>プロフィール</h2>
+                <p>Web制作とゲーム制作を楽しみながら、気になったアイデアを形にしています。</p>
+                <a class="rail-link" href="threegames/3d_2048.html"><span>制作物</span>3D 2048 ↗</a>
+                <a class="rail-link" href="other/index.html"><span>その他</span>Other works ↗</a>
+            </section>
+            <section class="rail-card" id="notifications">
+                <h2>おすすめトピック</h2>
+                <a class="rail-link" href="#machine-learning"><span>#1</span>Machine Learning</a>
+                <a class="rail-link" href="#recommended"><span>#2</span>Web Design</a>
+            </section>
+        </aside>
     </div>
 </body>
 </html>
