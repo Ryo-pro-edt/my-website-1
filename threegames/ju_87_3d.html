@@ -1,0 +1,2836 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>STUKA: Ju 87 急降下爆撃作戦 - ジェリコのラッパ</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js r128 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Google Fonts for Military Aviation Aesthetic & Japanese UI -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Oswald:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --luft-dark: #111519;
+      --luft-panel: rgba(18, 23, 28, 0.86);
+      --luft-border: #3b4652;
+      --luft-amber: #f59e0b;
+      --luft-green: #10b981;
+      --luft-red: #ef4444;
+      --luft-cyan: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0f14;
+      font-family: 'Noto Sans JP', sans-serif;
+      color: #e5e7eb;
+    }
+
+    .font-mono-tech {
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .font-display {
+      font-family: 'Oswald', 'Noto Sans JP', sans-serif;
+    }
+
+    #game-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    /* Luftwaffe Instrument Panel Styling */
+    .luft-card {
+      background: var(--luft-panel);
+      border: 1px solid var(--luft-border);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(6px);
+      border-radius: 10px;
+    }
+
+    .luft-dial {
+      background: radial-gradient(circle at 50% 50%, #1d242b 0%, #0d1115 88%, #07090b 100%);
+      border: 2px solid #4b5563;
+      box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.9), 0 4px 12px rgba(0, 0, 0, 0.6);
+      border-radius: 9999px;
+      position: relative;
+    }
+
+    .luft-btn {
+      background: linear-gradient(180deg, #2b333c 0%, #1b2026 100%);
+      border: 1px solid #4b5563;
+      color: #f3f4f6;
+      transition: all 0.15s ease;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .luft-btn:hover {
+      border-color: #f59e0b;
+      background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+      transform: translateY(-1px);
+    }
+
+    .luft-btn:active {
+      transform: translateY(1px);
+    }
+
+    .luft-btn-primary {
+      background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
+      border: 1px solid #fbbf24;
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
+    }
+
+    .luft-btn-primary:hover {
+      background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
+      box-shadow: 0 0 28px rgba(245, 158, 11, 0.6);
+    }
+
+    /* G-Force Blackout & Damage Vignette */
+    #vignette-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      transition: background 0.1s linear, box-shadow 0.1s linear;
+    }
+
+    /* Revi C/12D Reflector Gunsight Overlay (Cockpit View) */
+    #revi-gunsight {
+      position: fixed;
+      top: 46%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 12;
+      display: none;
+    }
+
+    /* Pull-up Warning Flash */
+    @keyframes pulseDanger {
+      0%, 100% { opacity: 0.95; transform: scale(1); }
+      50% { opacity: 0.25; transform: scale(1.04); }
+    }
+
+    .animate-pullup {
+      animation: pulseDanger 0.45s infinite ease-in-out;
+    }
+
+    /* Siren Active Glow */
+    @keyframes sirenPulse {
+      0%, 100% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.45); border-color: #ef4444; }
+      50% { box-shadow: 0 0 26px rgba(239, 68, 68, 0.95); border-color: #fca5a5; }
+    }
+
+    .siren-screaming {
+      animation: sirenPulse 0.35s infinite;
+    }
+
+    /* Custom Scrollbar for Briefing */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111519;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 3D Render Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- G-Force Blackout & Damage Screen Vignette -->
+  <div id="vignette-overlay"></div>
+
+  <!-- Cockpit Revi C/12D Gunsight & Dive Angle Lines -->
+  <div id="revi-gunsight">
+    <svg width="320" height="320" viewBox="0 0 320 320">
+      <!-- Reflector Glass Frame -->
+      <rect x="75" y="45" width="170" height="170" rx="14" fill="rgba(16, 185, 129, 0.05)" stroke="rgba(148, 163, 184, 0.45)" stroke-width="2" />
+      <!-- Amber Glowing Reticle -->
+      <circle cx="160" cy="130" r="46" fill="none" stroke="rgba(251, 191, 36, 0.85)" stroke-width="2" />
+      <circle cx="160" cy="130" r="18" fill="none" stroke="rgba(251, 191, 36, 0.7)" stroke-width="1.5" stroke-dasharray="4 3" />
+      <circle cx="160" cy="130" r="3" fill="#fbbf24" />
+      <!-- Crosshairs -->
+      <line x1="95" y1="130" x2="142" y2="130" stroke="rgba(251, 191, 36, 0.85)" stroke-width="2" />
+      <line x1="178" y1="130" x2="225" y2="130" stroke="rgba(251, 191, 36, 0.85)" stroke-width="2" />
+      <line x1="160" y1="68" x2="160" y2="112" stroke="rgba(251, 191, 36, 0.85)" stroke-width="2" />
+      <line x1="160" y1="148" x2="160" y2="195" stroke="rgba(251, 191, 36, 0.85)" stroke-width="2" />
+      <!-- Stuka Dive Angle Reference Lines (60°, 70°, 80°) -->
+      <line x1="20" y1="245" x2="300" y2="245" stroke="rgba(239, 68, 68, 0.65)" stroke-width="1.5" stroke-dasharray="6 4" />
+      <text x="24" y="240" fill="#fca5a5" font-size="11" font-family="Share Tech Mono">80° DIVE REF</text>
+      <line x1="35" y1="275" x2="285" y2="275" stroke="rgba(16, 185, 129, 0.65)" stroke-width="1.5" stroke-dasharray="6 4" />
+      <text x="38" y="270" fill="#6ee7b7" font-size="11" font-family="Share Tech Mono">70° OPTIMAL</text>
+    </svg>
+  </div>
+
+  <!-- Floating Screen-Space Target & Panic Markers Container -->
+  <div id="target-markers-layer" class="fixed inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+  <!-- HUD OVERLAY (Visible during active gameplay) -->
+  <div id="hud-container" class="fixed inset-0 pointer-events-none z-20 hidden flex flex-col justify-between p-2 sm:p-4">
+    
+    <!-- TOP HUD BAR: Mission Status & Quick Action Controls -->
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <!-- Mission & Stage Info -->
+      <div class="luft-card px-3 py-2 flex items-center gap-3 sm:gap-5 pointer-events-auto">
+        <div>
+          <div class="text-[10px] text-amber-400 font-bold tracking-wider uppercase">STAGE <span id="hud-stage">1</span></div>
+          <div id="hud-stage-name" class="text-xs sm:text-sm font-bold text-white">ライン川前線・補給路遮断</div>
+        </div>
+        <div class="h-7 w-px bg-slate-700"></div>
+        <div class="text-center">
+          <div class="text-[10px] text-slate-400">残存目標</div>
+          <div class="font-mono-tech text-base sm:text-lg font-bold text-red-400">
+            <span id="hud-targets-left">0</span><span class="text-xs text-slate-400">/<span id="hud-targets-total">0</span></span>
+          </div>
+        </div>
+        <div class="h-7 w-px bg-slate-700"></div>
+        <div class="text-center">
+          <div class="text-[10px] text-slate-400">戦果スコア</div>
+          <div id="hud-score" class="font-mono-tech text-base sm:text-lg font-bold text-amber-400">0</div>
+        </div>
+      </div>
+
+      <!-- Center Tactical Status Banner (Dynamic Notifications) -->
+      <div id="tactical-banner" class="hidden luft-card px-4 py-1.5 border-amber-500/80 text-center">
+        <div id="tactical-banner-text" class="text-xs sm:text-sm font-bold tracking-wide text-amber-300"></div>
+      </div>
+
+      <!-- Quick Action Controls (Interactive Buttons) -->
+      <div class="flex flex-wrap items-center gap-1.5 pointer-events-auto">
+        <button id="btn-toggle-siren" class="luft-btn px-2.5 py-1.5 text-xs font-bold flex items-center gap-1.5 border-amber-500/60" title="ジェリコのラッパ装備切替">
+          <span id="siren-equip-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>ラッパ: <span id="siren-equip-label">ON</span></span>
+        </button>
+        <button id="btn-switch-cam" class="luft-btn px-2.5 py-1.5 text-xs font-bold" title="視点切替 (C)">
+          視点: <span id="cam-mode-label" class="text-sky-400">後方</span> [C]
+        </button>
+        <button id="btn-invert-pitch" class="luft-btn px-2.5 py-1.5 text-xs font-bold" title="ピッチ操作上下反転">
+          操縦: <span id="invert-label" class="text-slate-300">標準</span>
+        </button>
+        <button id="btn-rearm" class="luft-btn px-2.5 py-1.5 text-xs font-bold text-emerald-300 border-emerald-600/60" title="高度1,800mへ再上昇して爆弾・弾薬を補給 (R)">
+          再上昇・補給 [R]
+        </button>
+        <button id="btn-toggle-help" class="luft-btn px-2.5 py-1.5 text-xs font-bold text-amber-300" title="操作ヘルプ表示">
+          ？
+        </button>
+      </div>
+    </div>
+
+    <!-- CENTER WARNINGS (Pull Up / Stall / Dive Lock-On) -->
+    <div class="flex flex-col items-center justify-center pointer-events-none my-auto">
+      <!-- Pull-Up Danger Warning -->
+      <div id="warning-pullup" class="hidden bg-red-950/90 border-2 border-red-500 px-6 py-2.5 rounded-xl text-center animate-pullup shadow-2xl">
+        <div class="text-red-400 font-black text-lg sm:text-2xl tracking-widest">⚠ PULL UP! 機首を引き起こせ！</div>
+        <div class="text-xs text-red-200 font-mono-tech">TERRAIN PROXIMITY ALERT — LOW ALTITUDE</div>
+      </div>
+
+      <!-- Stall Warning -->
+      <div id="warning-stall" class="hidden mt-2 bg-amber-950/90 border border-amber-500 px-4 py-1.5 rounded-lg text-center">
+        <div class="text-amber-400 font-bold text-sm sm:text-base">⚠ 失速警報 (STALL) — 機首を下げて加速せよ</div>
+      </div>
+
+      <!-- Optimal Dive Angle & Bomb Lock-On Indicator -->
+      <div id="dive-lock-badge" class="hidden mt-2 px-3 py-1 rounded-full bg-emerald-950/85 border border-emerald-400 text-emerald-300 text-xs font-bold tracking-wider">
+        ◎ 急降下角度良好 — 爆撃照準ロックオン [SPACE]
+      </div>
+    </div>
+
+    <!-- MIDDLE-LEFT & MIDDLE-RIGHT LUFTWAFFE INSTRUMENT CLUSTERS -->
+    <div class="flex items-end justify-between gap-2 mb-1">
+      
+      <!-- LEFT CLUSTER: Airspeed, Dive Angle, Throttle, Dive Brakes -->
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <!-- Airspeed Dial (Fahrtmesser) -->
+          <div class="luft-dial w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center p-1">
+            <div class="text-[9px] text-slate-400 tracking-wider">対気速度 IAS</div>
+            <div id="hud-speed" class="font-mono-tech text-xl sm:text-2xl font-bold text-white leading-none my-0.5">320</div>
+            <div class="text-[10px] text-amber-400 font-mono-tech">km/h</div>
+            <!-- Speed Bar -->
+            <div class="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+              <div id="hud-speed-bar" class="h-full bg-emerald-400 transition-all duration-75" style="width: 45%"></div>
+            </div>
+          </div>
+
+          <!-- Dive Angle Inclinometer -->
+          <div class="luft-dial w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center p-1">
+            <div class="text-[9px] text-slate-400 tracking-wider">降下角度 DIVE</div>
+            <div id="hud-dive-angle" class="font-mono-tech text-xl sm:text-2xl font-bold text-sky-300 leading-none my-0.5">0°</div>
+            <div id="hud-dive-zone" class="text-[9px] text-slate-400 font-bold">水平飛行</div>
+            <!-- Visual Horizon Tilt Line -->
+            <div class="w-16 h-1 bg-slate-700 rounded mt-1 relative overflow-hidden">
+              <div id="hud-dive-bar" class="h-full bg-sky-400 transition-all duration-75" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Throttle & Dive Brake Status Strip -->
+        <div class="luft-card px-3 py-2 flex items-center justify-between gap-3 text-xs">
+          <div>
+            <span class="text-slate-400 text-[10px] block">スロットル</span>
+            <span id="hud-throttle" class="font-mono-tech font-bold text-amber-400 text-sm">85%</span>
+          </div>
+          <div class="h-6 w-px bg-slate-700"></div>
+          <div>
+            <span class="text-slate-400 text-[10px] block">ダイブブレーキ [B]</span>
+            <span id="hud-dive-brake" class="font-bold text-slate-400">格納 RETRACTED</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM CENTER: Ordnance & Airframe Integrity -->
+      <div class="hidden md:flex flex-col items-center gap-2">
+        <div class="luft-card px-4 py-2 flex items-center gap-4">
+          <!-- SC500 Center Bomb -->
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400">胴体大型爆弾</div>
+            <div class="flex items-center justify-center gap-1 mt-0.5">
+              <span id="bomb-sc500-icon" class="inline-block w-3.5 h-3.5 rounded-sm bg-amber-500 shadow shadow-amber-500/50"></span>
+              <span class="font-mono-tech text-xs font-bold text-white">SC500 x<span id="hud-sc500">1</span></span>
+            </div>
+          </div>
+          <div class="h-7 w-px bg-slate-700"></div>
+          <!-- SC50 Wing Bombs -->
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400">主翼小型爆弾</div>
+            <div class="flex items-center justify-center gap-1 mt-0.5" id="bomb-sc50-icons">
+              <span class="w-2.5 h-3 rounded-sm bg-emerald-400"></span>
+              <span class="w-2.5 h-3 rounded-sm bg-emerald-400"></span>
+              <span class="w-2.5 h-3 rounded-sm bg-emerald-400"></span>
+              <span class="w-2.5 h-3 rounded-sm bg-emerald-400"></span>
+              <span class="font-mono-tech text-xs font-bold text-white ml-1">SC50 x<span id="hud-sc50">4</span></span>
+            </div>
+          </div>
+          <div class="h-7 w-px bg-slate-700"></div>
+          <!-- Drop Mode -->
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400">投下モード [X]</div>
+            <div id="hud-drop-mode" class="text-xs font-bold text-amber-300 mt-0.5">単発投下</div>
+          </div>
+          <div class="h-7 w-px bg-slate-700"></div>
+          <!-- MG17 Ammo & Hull HP -->
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400">MG17 機銃 / 機体耐久</div>
+            <div class="font-mono-tech text-xs font-bold mt-0.5">
+              <span id="hud-mg-ammo" class="text-sky-300">1000</span>発 / <span id="hud-hp" class="text-emerald-400">100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT CLUSTER: Altimeter, Jericho Trumpet Gauge & Tactical Minimap -->
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex items-center gap-2">
+          <!-- Jericho's Trumpet Dedicated Gauge & Waveform -->
+          <div id="jericho-hud-card" class="luft-card px-3 py-2 w-44 sm:w-52 border-slate-600 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-amber-400 tracking-wider">ジェリコのラッパ</span>
+              <span id="jericho-status-badge" class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-bold">待機中</span>
+            </div>
+            <div class="flex items-baseline justify-between mt-1">
+              <div>
+                <span id="jericho-rpm" class="font-mono-tech text-sm sm:text-base font-bold text-white">0</span>
+                <span class="text-[9px] text-slate-400">RPM</span>
+              </div>
+              <div>
+                <span id="jericho-db" class="font-mono-tech text-sm sm:text-base font-bold text-red-400">0</span>
+                <span class="text-[9px] text-slate-400">dB</span>
+              </div>
+            </div>
+            <!-- Live Sound Waveform Canvas -->
+            <canvas id="siren-wave-canvas" width="180" height="28" class="w-full h-7 bg-slate-950/90 rounded mt-1 border border-slate-800"></canvas>
+          </div>
+
+          <!-- Altimeter Dial (Höhenmesser) -->
+          <div class="luft-dial w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center p-1">
+            <div class="text-[9px] text-slate-400 tracking-wider">高度 ALT</div>
+            <div id="hud-alt" class="font-mono-tech text-xl sm:text-2xl font-bold text-emerald-300 leading-none my-0.5">1800</div>
+            <div class="text-[10px] text-slate-300 font-mono-tech">m</div>
+            <div class="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+              <div id="hud-alt-bar" class="h-full bg-emerald-400 transition-all duration-75" style="width: 90%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tactical Radar / Minimap + Mobile Compact Ordnance -->
+        <div class="flex items-center gap-2">
+          <!-- Compact Mobile Ordnance Info -->
+          <div class="md:hidden luft-card px-2.5 py-1.5 text-[11px] font-mono-tech">
+            <div>SC500:<span id="hud-sc500-m" class="text-amber-400 font-bold">1</span> SC50:<span id="hud-sc50-m" class="text-emerald-400 font-bold">4</span></div>
+            <div>HP:<span id="hud-hp-m" class="text-emerald-400 font-bold">100%</span></div>
+          </div>
+          <div class="luft-card p-1.5 relative">
+            <canvas id="minimap-canvas" width="116" height="116" class="w-24 h-24 sm:w-28 sm:h-28 rounded bg-slate-950 block"></canvas>
+            <div class="absolute bottom-2 left-2.5 text-[8px] font-mono-tech text-slate-400 pointer-events-none">RADAR 4KM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM KEYBIND GUIDE BAR -->
+    <div class="luft-card px-3 py-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-300">
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-mono-tech">W/S</kbd> 機首上下</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-mono-tech">A/D</kbd> 左右ロール</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-mono-tech">Q/E</kbd> ラダー</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-mono-tech">Shift/Ctrl</kbd> スロットル</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-emerald-300 font-mono-tech">B</kbd> ダイブブレーキ</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-red-400 font-mono-tech">Space</kbd> 爆弾投下 (<kbd class="text-amber-300 font-mono-tech">X</kbd>斉射切替)</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-sky-300 font-mono-tech">F / 左クリック</kbd> 7.92mm機銃</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200 font-mono-tech">C</kbd> 視点切替</span>
+    </div>
+  </div>
+
+  <!-- START / BRIEFING MODAL OVERLAY -->
+  <div id="start-modal" class="fixed inset-0 z-40 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="luft-card max-w-2xl w-full p-6 sm:p-8 border-amber-500/60 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-4 mb-5">
+        <div>
+          <div class="text-xs font-bold tracking-widest text-amber-400 uppercase">LUFTWAFFE DIVE BOMBER SIMULATION</div>
+          <h1 class="font-display text-2xl sm:text-4xl font-bold text-white tracking-wide mt-1">
+            Ju 87 スツーカ 急降下爆撃作戦
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-300 mt-1">
+            逆ガル翼急降下爆撃機と「ジェリコのラッパ」による精密対地攻撃シミュレーション
+          </p>
+        </div>
+        <div class="hidden sm:flex flex-col items-end font-mono-tech text-xs text-slate-400">
+          <span>MODEL: Ju 87 B-2</span>
+          <span>ENGINE: Jumo 211Da</span>
+          <span>SIREN: Jericho-Trompete</span>
+        </div>
+      </div>
+
+      <!-- Briefing Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 text-xs sm:text-sm">
+        <div class="bg-slate-900/80 border border-slate-700/80 rounded-lg p-3.5">
+          <div class="font-bold text-amber-400 mb-1.5 flex items-center gap-1.5">
+            <span>🔊</span> ジェリコのラッパ（心理兵器）
+          </div>
+          <p class="text-slate-300 leading-relaxed text-xs">
+            急降下で速度が <span class="text-white font-bold">340 km/h</span> を超えると主脚スパッツの風車サイレンが回転し、速度上昇とともに耳をつんざく絶叫音へ変化。最大咆哮時には敵対空砲と車両が<span class="text-purple-300 font-bold">「PANIC（恐慌状態）」</span>に陥り、対空砲火の命中率が激減します。
+          </p>
+        </div>
+        <div class="bg-slate-900/80 border border-slate-700/80 rounded-lg p-3.5">
+          <div class="font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+            <span>🎯</span> 急降下爆撃の極意
+          </div>
+          <p class="text-slate-300 leading-relaxed text-xs">
+            高度1,800mから目標上空へ接近し、<kbd class="px-1 bg-slate-800 rounded text-emerald-300">B</kbd> キーで<span class="text-white font-bold">ダイブブレーキ</span>を展開。降下角 <span class="text-emerald-300 font-bold">70°〜85°</span> で地上予測マーカーを目標に重ねて投下後、直ちに機首を引き起こしてください。
+          </p>
+        </div>
+      </div>
+
+      <!-- Controls Quick Reference -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3.5 mb-6 text-xs">
+        <div class="font-bold text-slate-200 mb-2">操縦・兵装コントロール一覧</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-slate-300">
+          <div><span class="text-amber-400 font-mono-tech font-bold">W / S (↑/↓)</span> : 機首下げ / 上げ</div>
+          <div><span class="text-amber-400 font-mono-tech font-bold">A / D (←/→)</span> : 左ロール / 右ロール</div>
+          <div><span class="text-amber-400 font-mono-tech font-bold">Q / E</span> : ラダー（ヨー旋回）</div>
+          <div><span class="text-amber-400 font-mono-tech font-bold">Shift / Ctrl</span> : スロットル増 / 減</div>
+          <div><span class="text-emerald-400 font-mono-tech font-bold">B</span> : ダイブブレーキ展開/格納</div>
+          <div><span class="text-red-400 font-mono-tech font-bold">Space</span> : 爆弾投下（<span class="text-amber-300 font-mono-tech">X</span>で斉射切替）</div>
+          <div><span class="text-sky-400 font-mono-tech font-bold">F / 左クリック</span> : 7.92mm機銃掃射</div>
+          <div><span class="text-slate-200 font-mono-tech font-bold">C</span> : 視点切替（後方/コックピット/爆弾）</div>
+          <div><span class="text-emerald-300 font-mono-tech font-bold">R</span> : 戦域離脱・再上昇（補給）</div>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+          <input type="checkbox" id="start-invert-pitch" class="rounded bg-slate-800 border-slate-600 text-amber-500 focus:ring-amber-500">
+          <span>フライトシム式（W / ↑ で機首下げ・標準設定）※オフでWが機首上げ</span>
+        </label>
+        <button id="btn-start-game" class="luft-btn-primary w-full sm:w-auto px-8 py-3.5 rounded-xl text-base tracking-wider cursor-pointer">
+          出撃開始（エンジン始動） ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HELP MODAL (In-Game Quick Reference) -->
+  <div id="help-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="luft-card max-w-lg w-full p-6 border-slate-500">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+        <h2 class="text-lg font-bold text-amber-400">操縦マニュアル & 戦術ガイド</h2>
+        <button id="btn-close-help" class="luft-btn px-3 py-1 text-xs">閉じる</button>
+      </div>
+      <ul class="space-y-2 text-xs sm:text-sm text-slate-200 mb-5">
+        <li><strong class="text-amber-300">1. 進入とダイブ:</strong> 高度1,800mから目標へ接近し、速度を絞って <kbd class="px-1 bg-slate-800 rounded">B</kbd> でダイブブレーキを展開。機首を70°〜85°下へ向けて急降下します。</li>
+        <li><strong class="text-red-400">2. ジェリコのラッパ:</strong> 340 km/h以上でサイレンが鳴り始め、460 km/h以上で敵対空砲に「PANIC」デバフを付与します。</li>
+        <li><strong class="text-emerald-300">3. 投弾と引き起こし:</strong> 地面の着弾予測マーカーが緑/赤にロックオンしたら <kbd class="px-1 bg-slate-800 rounded">Space</kbd> で投弾し、高度400m以上で機首を引き起こしてください。</li>
+        <li><strong class="text-sky-300">4. 補給と再攻撃:</strong> 爆弾を撃ち尽くしたら <kbd class="px-1 bg-slate-800 rounded">R</kbd> キーまたは右上の「再上昇・補給」ボタンで何度でも高度1,800mから再攻撃可能です。</li>
+      </ul>
+      <button id="btn-resume-help" class="luft-btn-primary w-full py-2.5 rounded-lg text-sm">戦闘へ戻る</button>
+    </div>
+  </div>
+
+  <!-- STAGE CLEAR / MISSION RESULT MODAL -->
+  <div id="result-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="luft-card max-w-lg w-full p-6 sm:p-8 border-amber-500/80 text-center">
+      <div id="result-subtitle" class="text-xs font-bold tracking-widest text-emerald-400 uppercase">MISSION ACCOMPLISHED</div>
+      <h2 id="result-title" class="font-display text-2xl sm:text-3xl font-bold text-white mt-1 mb-2">全地上目標を撃破！</h2>
+      <p id="result-desc" class="text-xs sm:text-sm text-slate-300 mb-5">精密な急降下爆撃により敵戦力を無力化しました。</p>
+
+      <!-- Rank Badge -->
+      <div class="my-4 flex flex-col items-center">
+        <div class="text-[11px] text-slate-400 uppercase tracking-widest">戦果評価ランク</div>
+        <div id="result-rank" class="font-display text-6xl font-black text-amber-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.6)] my-1">S</div>
+      </div>
+
+      <!-- Detailed Metrics -->
+      <div class="grid grid-cols-2 gap-2.5 bg-slate-950/85 border border-slate-800 rounded-xl p-4 mb-6 text-left text-xs sm:text-sm">
+        <div class="text-slate-400">爆撃命中率:</div>
+        <div id="stat-accuracy" class="font-mono-tech font-bold text-emerald-400 text-right">100%</div>
+
+        <div class="text-slate-400">最大急降下速度:</div>
+        <div id="stat-max-speed" class="font-mono-tech font-bold text-sky-300 text-right">584 km/h</div>
+
+        <div class="text-slate-400">ラッパ最大音圧レベル:</div>
+        <div id="stat-max-db" class="font-mono-tech font-bold text-red-400 text-right">124 dB</div>
+
+        <div class="text-slate-400">敵部隊恐慌(PANIC)誘発:</div>
+        <div id="stat-panic-count" class="font-mono-tech font-bold text-purple-300 text-right">4 部隊</div>
+
+        <div class="text-slate-400 border-t border-slate-800 pt-2">総合スコア:</div>
+        <div id="stat-total-score" class="font-mono-tech font-bold text-amber-400 text-right border-t border-slate-800 pt-2">12,500</div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button id="btn-retry-stage" class="luft-btn flex-1 py-3 rounded-xl text-sm font-bold">
+          同じステージを再プレイ
+        </button>
+        <button id="btn-next-stage" class="luft-btn-primary flex-1 py-3 rounded-xl text-sm">
+          次のステージへ出撃 ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     *  STUKA: Ju 87 3D DIVE BOMBER SIMULATION & JERICHO-TROMPETE SYNTHESIZER
+     *  Three.js r128 + Web Audio API Procedural Sound Engine
+     * ============================================================================
+     */
+
+    // ----------------------------------------------------------------------------
+    // 1. WEB AUDIO API PROCEDURAL SOUND SYSTEM (Jericho's Trumpet & WWII Audio)
+    // ----------------------------------------------------------------------------
+    class StukaAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.initialized = false;
+        this.muted = false;
+
+        // Jericho's Trumpet nodes
+        this.sirenOsc1 = null;
+        this.sirenOsc2 = null;
+        this.sirenOsc3 = null;
+        this.sirenFilter = null;
+        this.sirenGain = null;
+        this.sirenAnalyser = null;
+        this.waveData = null;
+
+        // Jumo 211 V12 Engine nodes
+        this.engineOsc1 = null;
+        this.engineOsc2 = null;
+        this.engineFilter = null;
+        this.engineGain = null;
+
+        // Dive Brake Wind Rush nodes
+        this.windGain = null;
+        this.windFilter = null;
+
+        // Pull-up Warning Alarm timer
+        this.lastAlarmTime = 0;
+      }
+
+      init() {
+        if (this.initialized) {
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+          return;
+        }
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = 0.65;
+          this.masterGain.connect(this.ctx.destination);
+
+          // --- A. JERICHO'S TRUMPET (3 Detuned Oscillators + Resonant Bandpass) ---
+          this.sirenFilter = this.ctx.createBiquadFilter();
+          this.sirenFilter.type = 'bandpass';
+          this.sirenFilter.frequency.value = 400;
+          this.sirenFilter.Q.value = 3.8;
+
+          this.sirenGain = this.ctx.createGain();
+          this.sirenGain.gain.value = 0.0001;
+
+          this.sirenAnalyser = this.ctx.createAnalyser();
+          this.sirenAnalyser.fftSize = 256;
+          this.waveData = new Uint8Array(this.sirenAnalyser.frequencyBinCount);
+
+          this.sirenOsc1 = this.ctx.createOscillator();
+          this.sirenOsc1.type = 'sawtooth';
+          this.sirenOsc1.frequency.value = 220;
+
+          this.sirenOsc2 = this.ctx.createOscillator();
+          this.sirenOsc2.type = 'sawtooth';
+          this.sirenOsc2.frequency.value = 224; // Slight detune for eerie dual-siren beating
+
+          this.sirenOsc3 = this.ctx.createOscillator();
+          this.sirenOsc3.type = 'triangle';
+          this.sirenOsc3.frequency.value = 440; // Upper octave shriek harmonic
+
+          this.sirenOsc1.connect(this.sirenFilter);
+          this.sirenOsc2.connect(this.sirenFilter);
+          this.sirenOsc3.connect(this.sirenFilter);
+
+          this.sirenFilter.connect(this.sirenGain);
+          this.sirenGain.connect(this.sirenAnalyser);
+          this.sirenAnalyser.connect(this.masterGain);
+
+          this.sirenOsc1.start();
+          this.sirenOsc2.start();
+          this.sirenOsc3.start();
+
+          // --- B. JUMO 211 V12 ENGINE RUMBLE ---
+          this.engineFilter = this.ctx.createBiquadFilter();
+          this.engineFilter.type = 'lowpass';
+          this.engineFilter.frequency.value = 160;
+
+          this.engineGain = this.ctx.createGain();
+          this.engineGain.gain.value = 0.14;
+
+          this.engineOsc1 = this.ctx.createOscillator();
+          this.engineOsc1.type = 'sawtooth';
+          this.engineOsc1.frequency.value = 48;
+
+          this.engineOsc2 = this.ctx.createOscillator();
+          this.engineOsc2.type = 'triangle';
+          this.engineOsc2.frequency.value = 96;
+
+          this.engineOsc1.connect(this.engineFilter);
+          this.engineOsc2.connect(this.engineFilter);
+          this.engineFilter.connect(this.engineGain);
+          this.engineGain.connect(this.masterGain);
+
+          this.engineOsc1.start();
+          this.engineOsc2.start();
+
+          // --- C. AERODYNAMIC WIND / DIVE BRAKE NOISE ---
+          const bufferSize = this.ctx.sampleRate * 2;
+          const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+          }
+          const whiteNoise = this.ctx.createBufferSource();
+          whiteNoise.buffer = noiseBuffer;
+          whiteNoise.loop = true;
+
+          this.windFilter = this.ctx.createBiquadFilter();
+          this.windFilter.type = 'bandpass';
+          this.windFilter.frequency.value = 550;
+          this.windFilter.Q.value = 1.2;
+
+          this.windGain = this.ctx.createGain();
+          this.windGain.gain.value = 0.01;
+
+          whiteNoise.connect(this.windFilter);
+          this.windFilter.connect(this.windGain);
+          this.windGain.connect(this.masterGain);
+          whiteNoise.start();
+
+          this.initialized = true;
+        } catch (err) {
+          console.warn('Web Audio initialization failed:', err);
+        }
+      }
+
+      update(speedKmh, throttle, diveBrakesDeployed, sirenEnabled, isPaused) {
+        if (!this.initialized || !this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        if (isPaused || this.muted) {
+          this.sirenGain.gain.setTargetAtTime(0.0001, now, 0.08);
+          this.engineGain.gain.setTargetAtTime(0.0001, now, 0.08);
+          this.windGain.gain.setTargetAtTime(0.0001, now, 0.08);
+          return { rpm: 0, db: 0 };
+        }
+
+        // 1. Update Jumo 211 Engine Sound
+        const engineFreq = 38 + throttle * 36 + (speedKmh / 650) * 18;
+        this.engineOsc1.frequency.setTargetAtTime(engineFreq, now, 0.06);
+        this.engineOsc2.frequency.setTargetAtTime(engineFreq * 2.01, now, 0.06);
+        this.engineFilter.frequency.setTargetAtTime(120 + throttle * 140, now, 0.08);
+        this.engineGain.gain.setTargetAtTime(0.09 + throttle * 0.11, now, 0.08);
+
+        // 2. Update Dive Brake & Airspeed Wind Sound
+        const speedNorm = Math.min(1, Math.max(0, (speedKmh - 180) / 480));
+        const brakeBoost = diveBrakesDeployed ? 0.14 : 0.02;
+        this.windFilter.frequency.setTargetAtTime(320 + speedNorm * 950 + (diveBrakesDeployed ? 250 : 0), now, 0.08);
+        this.windGain.gain.setTargetAtTime(speedNorm * (0.04 + brakeBoost), now, 0.08);
+
+        // 3. Update Jericho's Trumpet (Activates above 340 km/h when enabled)
+        let rpm = 0;
+        let db = 0;
+        if (sirenEnabled && speedKmh > 340) {
+          // Ratio from 0 (at 340 km/h) to 1 (at 640 km/h)
+          const ratio = Math.min(1.15, (speedKmh - 340) / 300);
+          rpm = Math.round(1800 + ratio * 10200);
+          db = Math.round(72 + Math.min(1, ratio) * 56); // Up to 128 dB shriek
+
+          // Pitch sweeps from eerie 190 Hz growl to piercing 1,120 Hz wail
+          const baseFreq = 190 + Math.pow(ratio, 1.28) * 860;
+          // Dual-trumpet rotor beat frequency increases with RPM
+          const detuneBeat = 3.5 + ratio * 14.0;
+
+          this.sirenOsc1.frequency.setTargetAtTime(baseFreq, now, 0.05);
+          this.sirenOsc2.frequency.setTargetAtTime(baseFreq + detuneBeat, now, 0.05);
+          this.sirenOsc3.frequency.setTargetAtTime(baseFreq * 2.0, now, 0.05);
+
+          this.sirenFilter.frequency.setTargetAtTime(baseFreq * 1.45, now, 0.05);
+          this.sirenFilter.Q.setTargetAtTime(3.2 + ratio * 4.5, now, 0.08);
+
+          const targetGain = Math.min(0.42, 0.03 + Math.pow(ratio, 1.1) * 0.36);
+          this.sirenGain.gain.setTargetAtTime(targetGain, now, 0.06);
+        } else {
+          this.sirenGain.gain.setTargetAtTime(0.0001, now, 0.18);
+          this.sirenOsc1.frequency.setTargetAtTime(160, now, 0.25);
+          this.sirenOsc2.frequency.setTargetAtTime(162, now, 0.25);
+          this.sirenOsc3.frequency.setTargetAtTime(320, now, 0.25);
+        }
+
+        return { rpm, db };
+      }
+
+      playMachineGunShot() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(190 + Math.random() * 40, now);
+        osc.frequency.exponentialRampToValueAtTime(42, now + 0.055);
+
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.065);
+      }
+
+      playBombRelease() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        // Mechanical clunk + falling whistle
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(760, now + 0.05);
+        osc.frequency.exponentialRampToValueAtTime(240, now + 2.4);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.11, now + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 2.55);
+      }
+
+      playExplosion(intensity = 1.0) {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const duration = 1.3 * intensity;
+
+        // Sub-bass punch
+        const subOsc = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(110, now);
+        subOsc.frequency.exponentialRampToValueAtTime(22, now + duration * 0.75);
+
+        subGain.gain.setValueAtTime(0.55 * intensity, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        subOsc.connect(subGain);
+        subGain.connect(this.masterGain);
+        subOsc.start(now);
+        subOsc.stop(now + duration);
+
+        // Filtered explosion roar noise
+        const bufSize = Math.floor(this.ctx.sampleRate * duration);
+        const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buf;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(650, now);
+        filter.frequency.exponentialRampToValueAtTime(90, now + duration);
+
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.5 * intensity, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        noise.connect(filter);
+        filter.connect(nGain);
+        nGain.connect(this.masterGain);
+        noise.start(now);
+      }
+
+      playPullUpAlarm() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        if (now - this.lastAlarmTime < 0.36) return;
+        this.lastAlarmTime = now;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(660, now + 0.12);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.26);
+      }
+    }
+
+    // ----------------------------------------------------------------------------
+    // 2. THREE.JS SCENE, TERRAIN, AND DETAILED JU 87 STUKA 3D MODEL
+    // ----------------------------------------------------------------------------
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x769ec4);
+    scene.fog = new THREE.FogExp2(0x8bb0d1, 0.00018);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 16000);
+
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x3b4d2b, 0.85);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff5e4, 1.35);
+    sunLight.position.set(1600, 3200, 1400);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 500;
+    sunLight.shadow.camera.far = 7500;
+    const dShadow = 2200;
+    sunLight.shadow.camera.left = -dShadow;
+    sunLight.shadow.camera.right = dShadow;
+    sunLight.shadow.camera.top = dShadow;
+    sunLight.shadow.camera.bottom = -dShadow;
+    scene.add(sunLight);
+
+    // --- TERRAIN HEIGHT FUNCTION ---
+    // Winding river along X = riverCenterX(z), flat bridge & road corridor, rolling hills outside
+    function getRiverCenterX(z) {
+      return Math.sin(z * 0.0014) * 380 + Math.cos(z * 0.0006) * 180;
+    }
+
+    function getTerrainHeight(x, z) {
+      const riverX = getRiverCenterX(z);
+      const distToRiver = Math.abs(x - riverX);
+
+      // River channel (below water level y = 0)
+      if (distToRiver < 55) {
+        return -6;
+      }
+      // Gentle riverbanks & central valley floor
+      const bankFactor = Math.min(1, Math.max(0, (distToRiver - 55) / 280));
+      const basePlain = bankFactor * 14;
+
+      // Rolling hills further away from the river valley
+      const hillFactor = Math.min(1, Math.max(0, (distToRiver - 380) / 1400));
+      const hills =
+        (Math.sin(x * 0.0018) * Math.cos(z * 0.0018) * 110 +
+          Math.sin(x * 0.0045 + z * 0.003) * 45 +
+          60) *
+        hillFactor;
+
+      return basePlain + hills;
+    }
+
+    // Build Terrain Mesh
+    function buildEnvironment() {
+      const envGroup = new THREE.Group();
+
+      // 1. Ground Mesh
+      const size = 14000;
+      const segments = 160;
+      const terrainGeo = new THREE.PlaneGeometry(size, size, segments, segments);
+      terrainGeo.rotateX(-Math.PI / 2);
+
+      const posAttr = terrainGeo.attributes.position;
+      const colors = [];
+      const colorLow = new THREE.Color(0x4b6334);   // Lush valley green
+      const colorMid = new THREE.Color(0x5c733d);   // Meadow olive
+      const colorHigh = new THREE.Color(0x6c7556);  // Hilltop scrub
+      const colorSand = new THREE.Color(0x8c7f5a);  // Riverbank dirt
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const vx = posAttr.getX(i);
+        const vz = posAttr.getZ(i);
+        const vy = getTerrainHeight(vx, vz);
+        posAttr.setY(i, vy);
+
+        const c = new THREE.Color();
+        if (vy < 2.5) {
+          c.copy(colorSand);
+        } else if (vy < 35) {
+          c.copy(colorLow).lerp(colorMid, vy / 35);
+        } else {
+          c.copy(colorMid).lerp(colorHigh, Math.min(1, (vy - 35) / 110));
+        }
+        colors.push(c.r, c.g, c.b);
+      }
+      terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      terrainGeo.computeVertexNormals();
+
+      const terrainMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+      terrainMesh.receiveShadow = true;
+      envGroup.add(terrainMesh);
+
+      // 2. River Water Plane (y = 0)
+      const waterGeo = new THREE.PlaneGeometry(size, size);
+      waterGeo.rotateX(-Math.PI / 2);
+      const waterMat = new THREE.MeshPhongMaterial({
+        color: 0x1e4e68,
+        specular: 0x93c5fd,
+        shininess: 65,
+        transparent: true,
+        opacity: 0.9
+      });
+      const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+      waterMesh.position.y = 0;
+      envGroup.add(waterMesh);
+
+      // 3. Railway Track Line (Running along Z = 0 across the river)
+      const railBedGeo = new THREE.BoxGeometry(4800, 1.5, 14);
+      const railBedMat = new THREE.MeshLambertMaterial({ color: 0x4b4642 });
+      const railBedLeft = new THREE.Mesh(railBedGeo, railBedMat);
+      railBedLeft.position.set(-2460, 14.2, 0);
+      envGroup.add(railBedLeft);
+
+      const railBedRight = new THREE.Mesh(railBedGeo, railBedMat);
+      railBedRight.position.set(2460, 14.2, 0);
+      envGroup.add(railBedRight);
+
+      // 4. Scattered Trees & Woods
+      const trunkGeo = new THREE.CylinderGeometry(1.2, 1.8, 8, 5);
+      const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a3525 });
+      const crownGeo = new THREE.ConeGeometry(7, 18, 6);
+      const crownMat = new THREE.MeshLambertMaterial({ color: 0x2d4c22 });
+
+      for (let i = 0; i < 260; i++) {
+        const tx = (Math.random() - 0.5) * 4600;
+        const tz = (Math.random() - 0.5) * 4600;
+        const ty = getTerrainHeight(tx, tz);
+        if (ty > 4 && Math.abs(tz) > 35) {
+          const tree = new THREE.Group();
+          const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+          trunk.position.y = 4;
+          const crown = new THREE.Mesh(crownGeo, crownMat);
+          crown.position.y = 14;
+          tree.add(trunk, crown);
+          const scale = 0.8 + Math.random() * 0.9;
+          tree.scale.setScalar(scale);
+          tree.position.set(tx, ty, tz);
+          envGroup.add(tree);
+        }
+      }
+
+      // 5. Volumetric-style Cloud Layer around 1,250m - 1,450m
+      const cloudMat = new THREE.MeshLambertMaterial({
+        color: 0xf8fafc,
+        transparent: true,
+        opacity: 0.72
+      });
+      const puffGeo = new THREE.DodecahedronGeometry(65, 1);
+
+      for (let i = 0; i < 42; i++) {
+        const cloud = new THREE.Group();
+        const puffs = 3 + Math.floor(Math.random() * 4);
+        for (let p = 0; p < puffs; p++) {
+          const puff = new THREE.Mesh(puffGeo, cloudMat);
+          puff.position.set(
+            (Math.random() - 0.5) * 140,
+            (Math.random() - 0.5) * 28,
+            (Math.random() - 0.5) * 110
+          );
+          puff.scale.set(1 + Math.random() * 0.8, 0.55 + Math.random() * 0.3, 1 + Math.random() * 0.8);
+          cloud.add(puff);
+        }
+        cloud.position.set(
+          (Math.random() - 0.5) * 6500,
+          1220 + Math.random() * 280,
+          (Math.random() - 0.5) * 6500
+        );
+        envGroup.add(cloud);
+      }
+
+      scene.add(envGroup);
+    }
+
+    buildEnvironment();
+
+    // ----------------------------------------------------------------------------
+    // 3. DETAILED JU 87 STUKA 3D MODEL BUILDER (Matching the 3-View Blueprint)
+    // ----------------------------------------------------------------------------
+    function createStukaModel() {
+      const stukaRoot = new THREE.Group();
+
+      // Luftwaffe RLM 70/71 Dark Green Splinter Camouflage & RLM 65 Light Blue Underside
+      const camoTopMat = new THREE.MeshStandardMaterial({
+        color: 0x364232,
+        roughness: 0.55,
+        metalness: 0.2
+      });
+      const camoDarkMat = new THREE.MeshStandardMaterial({
+        color: 0x263024,
+        roughness: 0.6,
+        metalness: 0.2
+      });
+      const bellyBlueMat = new THREE.MeshStandardMaterial({
+        color: 0x7ba1b7,
+        roughness: 0.5,
+        metalness: 0.15
+      });
+      const yellowNoseMat = new THREE.MeshStandardMaterial({
+        color: 0xeab308, // Eastern Front / Channel Theater Yellow Nose & Rudder trim
+        roughness: 0.45
+      });
+      const canopyGlassMat = new THREE.MeshPhongMaterial({
+        color: 0x93c5fd,
+        specular: 0xffffff,
+        shininess: 95,
+        transparent: true,
+        opacity: 0.48
+      });
+      const metalDarkMat = new THREE.MeshStandardMaterial({
+        color: 0x1f2937,
+        roughness: 0.4,
+        metalness: 0.7
+      });
+      const tireMat = new THREE.MeshLambertMaterial({ color: 0x141619 });
+
+      // 1. FUSELAGE (Slender rear + deep chin radiator cowling)
+      // Forward engine cowling
+      const cowlingGeo = new THREE.CylinderGeometry(0.68, 0.82, 2.6, 16);
+      cowlingGeo.rotateX(Math.PI / 2);
+      const cowling = new THREE.Mesh(cowlingGeo, camoTopMat);
+      cowling.position.set(0, 0.05, -2.5);
+      cowling.castShadow = true;
+      stukaRoot.add(cowling);
+
+      // Iconic Ju 87 Deep Chin Radiator Scoop under nose
+      const chinGeo = new THREE.BoxGeometry(0.92, 0.68, 2.1);
+      const chinRadiator = new THREE.Mesh(chinGeo, yellowNoseMat);
+      chinRadiator.position.set(0, -0.45, -2.55);
+      stukaRoot.add(chinRadiator);
+
+      // Radiator grille intake
+      const grilleGeo = new THREE.BoxGeometry(0.76, 0.52, 0.12);
+      const grille = new THREE.Mesh(grilleGeo, metalDarkMat);
+      grille.position.set(0, -0.45, -3.62);
+      stukaRoot.add(grille);
+
+      // Exhaust stubs (6 per side)
+      for (let side of [-1, 1]) {
+        for (let i = 0; i < 6; i++) {
+          const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.25, 6), metalDarkMat);
+          stub.rotation.z = side * 0.8;
+          stub.position.set(side * 0.72, 0.12, -1.8 - i * 0.26);
+          stukaRoot.add(stub);
+        }
+      }
+
+      // Main center fuselage
+      const midFuseGeo = new THREE.CylinderGeometry(0.82, 0.72, 3.2, 16);
+      midFuseGeo.rotateX(Math.PI / 2);
+      const midFuse = new THREE.Mesh(midFuseGeo, camoTopMat);
+      midFuse.position.set(0, 0.02, 0.3);
+      midFuse.castShadow = true;
+      stukaRoot.add(midFuse);
+
+      // Tapered rear fuselage
+      const rearFuseGeo = new THREE.CylinderGeometry(0.72, 0.26, 4.4, 16);
+      rearFuseGeo.rotateX(Math.PI / 2);
+      const rearFuse = new THREE.Mesh(rearFuseGeo, camoTopMat);
+      rearFuse.position.set(0, 0.12, 4.0);
+      rearFuse.castShadow = true;
+      stukaRoot.add(rearFuse);
+
+      // Spinner & 3-Blade Propeller
+      const spinnerGeo = new THREE.ConeGeometry(0.54, 1.05, 16);
+      spinnerGeo.rotateX(-Math.PI / 2);
+      const spinner = new THREE.Mesh(spinnerGeo, yellowNoseMat);
+      spinner.position.set(0, 0.08, -4.3);
+      stukaRoot.add(spinner);
+
+      const propellerGroup = new THREE.Group();
+      propellerGroup.position.set(0, 0.08, -4.05);
+      const bladeGeo = new THREE.BoxGeometry(0.24, 1.75, 0.04);
+      for (let b = 0; b < 3; b++) {
+        const blade = new THREE.Mesh(bladeGeo, metalDarkMat);
+        blade.rotation.z = (b * Math.PI * 2) / 3;
+        blade.position.set(Math.sin(blade.rotation.z) * -0.82, Math.cos(blade.rotation.z) * 0.82, 0);
+        propellerGroup.add(blade);
+      }
+      stukaRoot.add(propellerGroup);
+
+      // 2. GREENHOUSE CANOPY, ANTENNA MAST & REAR MG 15
+      const canopyGroup = new THREE.Group();
+      canopyGroup.position.set(0, 0.85, 0.25);
+
+      const canopyGlass = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.65, 3.1), canopyGlassMat);
+      canopyGroup.add(canopyGlass);
+
+      // Canopy structural frames (ribs)
+      for (let f = -1.4; f <= 1.4; f += 0.56) {
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.68, 0.06), camoDarkMat);
+        rib.position.z = f;
+        canopyGroup.add(rib);
+      }
+      // Top spine frame
+      const topFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 3.12), camoDarkMat);
+      topFrame.position.y = 0.33;
+      canopyGroup.add(topFrame);
+
+      // Dorsal Antenna Mast & Wire to Tail
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.85, 6), metalDarkMat);
+      mast.position.set(0, 0.72, -0.35);
+      canopyGroup.add(mast);
+
+      // Rear-facing MG 15 machine gun barrel
+      const rearGun = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.95, 8), metalDarkMat);
+      rearGun.rotation.x = Math.PI / 2 - 0.22;
+      rearGun.position.set(0, 0.15, 1.75);
+      canopyGroup.add(rearGun);
+
+      stukaRoot.add(canopyGroup);
+
+      // 3. INVERTED GULL WINGS (逆ガルウィング) + DIVE BRAKES
+      const diveBrakes = [];
+      const wingSirenProps = [];
+      const sirenVortexRings = [];
+
+      [-1, 1].forEach((side) => {
+        // Inner Wing Section (Slopes DOWNWARD from root at -16 degrees)
+        const innerWingGroup = new THREE.Group();
+        innerWingGroup.position.set(side * 0.72, -0.35, -0.35);
+        innerWingGroup.rotation.z = side * -0.28; // Downward anhedral angle
+
+        const innerWingGeo = new THREE.BoxGeometry(2.3, 0.22, 2.35);
+        const innerWingTop = new THREE.Mesh(innerWingGeo, camoTopMat);
+        innerWingTop.position.set(side * 1.1, 0.03, 0);
+        innerWingTop.castShadow = true;
+        innerWingGroup.add(innerWingTop);
+
+        const innerWingBot = new THREE.Mesh(new THREE.BoxGeometry(2.28, 0.08, 2.32), bellyBlueMat);
+        innerWingBot.position.set(side * 1.1, -0.09, 0);
+        innerWingGroup.add(innerWingBot);
+
+        stukaRoot.add(innerWingGroup);
+
+        // Knee Joint Position (Where inner wing meets outer wing & fixed landing gear!)
+        const kneeX = side * (0.72 + Math.cos(0.28) * 2.15);
+        const kneeY = -0.35 - Math.sin(0.28) * 2.15;
+
+        // Outer Wing Section (Slopes UPWARD from knee at +11 degrees, tapered tip)
+        const outerWingGroup = new THREE.Group();
+        outerWingGroup.position.set(kneeX, kneeY, -0.35);
+        outerWingGroup.rotation.z = side * 0.19; // Upward dihedral angle
+
+        const outerWingGeo = new THREE.BoxGeometry(4.6, 0.18, 1.95);
+        const outerWing = new THREE.Mesh(outerWingGeo, camoDarkMat);
+        outerWing.position.set(side * 2.25, 0.02, 0.12);
+        outerWing.castShadow = true;
+        outerWingGroup.add(outerWing);
+
+        const outerWingBot = new THREE.Mesh(new THREE.BoxGeometry(4.55, 0.06, 1.92), bellyBlueMat);
+        outerWingBot.position.set(side * 2.25, -0.08, 0.12);
+        outerWingGroup.add(outerWingBot);
+
+        // Wingtip navigation light & Pitot tube on port wing
+        if (side === -1) {
+          const pitot = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 1.1, 6), metalDarkMat);
+          pitot.rotation.x = Math.PI / 2;
+          pitot.position.set(-4.3, 0.02, -1.25);
+          outerWingGroup.add(pitot);
+        }
+
+        // Underwing Slatted Dive Brake (Animates 90 deg downward when deployed)
+        const brakePivot = new THREE.Group();
+        brakePivot.position.set(side * 1.85, -0.14, -0.62);
+        const brakePlate = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.05, 0.34), metalDarkMat);
+        brakePlate.position.set(0, 0, 0.15);
+        brakePivot.add(brakePlate);
+        outerWingGroup.add(brakePivot);
+        diveBrakes.push(brakePivot);
+
+        stukaRoot.add(outerWingGroup);
+
+        // 4. FIXED LANDING GEAR WITH SPATS & JERICHO'S TRUMPET
+        const gearGroup = new THREE.Group();
+        gearGroup.position.set(kneeX, kneeY, -0.75);
+
+        // Vertical Strut
+        const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 1.15, 10), camoTopMat);
+        strut.position.set(0, -0.55, 0);
+        gearGroup.add(strut);
+
+        // Teardrop Wheel Spat (Aerodynamic Fairing)
+        const spatBody = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), camoDarkMat);
+        spatBody.scale.set(0.68, 1.15, 2.35);
+        spatBody.position.set(0, -1.25, 0.1);
+        spatBody.castShadow = true;
+        gearGroup.add(spatBody);
+
+        // Protruding Main Tire
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.24, 16), tireMat);
+        tire.rotation.z = Math.PI / 2;
+        tire.position.set(0, -1.48, 0.02);
+        gearGroup.add(tire);
+
+        // --- JERICHO'S TRUMPET (Wind-driven Siren mounted on upper front spat) ---
+        const sirenHousing = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.42, 10), metalDarkMat);
+        sirenHousing.rotation.x = Math.PI / 2;
+        sirenHousing.position.set(side * 0.18, -0.45, -0.25);
+        gearGroup.add(sirenHousing);
+
+        // Spinning Siren Windmill Propeller
+        const sirenProp = new THREE.Group();
+        sirenProp.position.set(side * 0.18, -0.45, -0.48);
+        const sBlade1 = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.05, 0.02), yellowNoseMat);
+        const sBlade2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.02), yellowNoseMat);
+        sirenProp.add(sBlade1, sBlade2);
+        gearGroup.add(sirenProp);
+        wingSirenProps.push(sirenProp);
+
+        // Visual Air Vortex Ring around Siren (visible when screaming in a dive)
+        const vortexGeo = new THREE.RingGeometry(0.24, 0.34, 20);
+        const vortexMat = new THREE.MeshBasicMaterial({
+          color: 0xe0f2fe,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.0
+        });
+        const vortexMesh = new THREE.Mesh(vortexGeo, vortexMat);
+        vortexMesh.position.set(side * 0.18, -0.45, -0.52);
+        gearGroup.add(vortexMesh);
+        sirenVortexRings.push(vortexMesh);
+
+        stukaRoot.add(gearGroup);
+      });
+
+      // 5. TAILPLANE (Horizontal Stabilizer with Diagonal Struts + Vertical Rudder + Tailwheel)
+      const tailGroup = new THREE.Group();
+      tailGroup.position.set(0, 0.32, 5.75);
+
+      // Vertical Fin & Yellow-Trimmed Rudder
+      const vFin = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.65, 1.35), camoTopMat);
+      vFin.position.set(0, 0.78, 0.1);
+      tailGroup.add(vFin);
+
+      const rudder = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.6, 0.55), yellowNoseMat);
+      rudder.position.set(0, 0.78, 0.98);
+      tailGroup.add(rudder);
+
+      // Horizontal Stabilizer (Squared Tips)
+      const hStab = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 1.15), camoTopMat);
+      hStab.position.set(0, 0.25, 0.2);
+      hStab.castShadow = true;
+      tailGroup.add(hStab);
+
+      // Iconic Ju 87 Under-Tail Diagonal Support Struts
+      [-1, 1].forEach((side) => {
+        const tailStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.15, 6), metalDarkMat);
+        tailStrut.rotation.z = side * 0.85;
+        tailStrut.position.set(side * 0.65, -0.15, 0.2);
+        tailGroup.add(tailStrut);
+      });
+
+      // Fixed Tailwheel
+      const tailWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.1, 12), tireMat);
+      tailWheel.rotation.z = Math.PI / 2;
+      tailWheel.position.set(0, -0.55, 0.65);
+      tailGroup.add(tailWheel);
+
+      stukaRoot.add(tailGroup);
+
+      // 6. SWINGING TRAPEZE BOMB CRUTCH (SC500) & UNDERWING SC50 BOMBS
+      const trapezePivot = new THREE.Group();
+      trapezePivot.position.set(0, -0.68, -0.85);
+
+      const armLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), metalDarkMat);
+      armLeft.position.set(-0.28, -0.35, 0);
+      const armRight = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), metalDarkMat);
+      armRight.position.set(0.28, -0.35, 0);
+      trapezePivot.add(armLeft, armRight);
+
+      // SC500 Heavy Bomb Mesh attached to Trapeze
+      const sc500Mesh = createBombMesh(1.0);
+      sc500Mesh.position.set(0, -0.78, 0.05);
+      trapezePivot.add(sc500Mesh);
+      stukaRoot.add(trapezePivot);
+
+      // 4x SC50 Wing Bombs
+      const sc50Meshes = [];
+      const wingBombOffsets = [
+        [-3.4, -0.82, -0.25],
+        [-4.2, -0.68, -0.25],
+        [3.4, -0.82, -0.25],
+        [4.2, -0.68, -0.25]
+      ];
+      wingBombOffsets.forEach(([bx, by, bz]) => {
+        const bMesh = createBombMesh(0.52);
+        bMesh.position.set(bx, by, bz);
+        stukaRoot.add(bMesh);
+        sc50Meshes.push(bMesh);
+      });
+
+      scene.add(stukaRoot);
+
+      return {
+        root: stukaRoot,
+        propeller: propellerGroup,
+        diveBrakes,
+        wingSirenProps,
+        sirenVortexRings,
+        trapezePivot,
+        sc500Mesh,
+        sc50Meshes
+      };
+    }
+
+    function createBombMesh(scale = 1.0) {
+      const group = new THREE.Group();
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x374151, roughness: 0.45, metalness: 0.6 });
+      const finMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.5 });
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.45, 12), bodyMat);
+      body.rotation.x = Math.PI / 2;
+      group.add(body);
+
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), bodyMat);
+      nose.position.z = -0.72;
+      group.add(nose);
+
+      // Tail fins
+      const fin1 = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.04, 0.38), finMat);
+      fin1.position.z = 0.68;
+      const fin2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.46, 0.38), finMat);
+      fin2.position.z = 0.68;
+      group.add(fin1, fin2);
+
+      group.scale.setScalar(scale);
+      return group;
+    }
+
+    const stuka = createStukaModel();
+
+    // ----------------------------------------------------------------------------
+    // 4. BALLISTIC PREDICTION RETICLE ON GROUND
+    // ----------------------------------------------------------------------------
+    const impactMarkerGroup = new THREE.Group();
+    const outerRingGeo = new THREE.RingGeometry(24, 30, 36);
+    outerRingGeo.rotateX(-Math.PI / 2);
+    const outerRingMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+    const outerRing = new THREE.Mesh(outerRingGeo, outerRingMat);
+
+    const innerDotGeo = new THREE.CircleGeometry(6, 20);
+    innerDotGeo.rotateX(-Math.PI / 2);
+    const innerDotMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+    const innerDot = new THREE.Mesh(innerDotGeo, innerDotMat);
+
+    impactMarkerGroup.add(outerRing, innerDot);
+    scene.add(impactMarkerGroup);
+
+    // ----------------------------------------------------------------------------
+    // 5. GROUND TARGETS, STAGES & ENEMY FLAK AI
+    // ----------------------------------------------------------------------------
+    const STAGES = [
+      {
+        stage: 1,
+        name: 'ライン川前線・補給路遮断',
+        desc: '鉄橋を渡る補給部隊と燃料タンク基地を急降下爆撃で破壊せよ。',
+        targets: [
+          { type: 'bridge', name: '戦略鉄橋', x: 0, z: 0, hp: 180, radius: 34, score: 2500 },
+          { type: 'fuel', name: '燃料タンク基地 A', x: -240, z: -220, hp: 90, radius: 26, score: 1500 },
+          { type: 'fuel', name: '燃料タンク基地 B', x: -290, z: -160, hp: 90, radius: 26, score: 1500 },
+          { type: 'tank', name: '中戦車縦隊 1号車', x: 180, z: 140, hp: 80, radius: 18, score: 1200, speed: 12 },
+          { type: 'tank', name: '中戦車縦隊 2号車', x: 240, z: 140, hp: 80, radius: 18, score: 1200, speed: 12 },
+          { type: 'flak', name: '37mm対空砲陣地', x: -150, z: 180, hp: 65, radius: 20, score: 1000 }
+        ]
+      },
+      {
+        stage: 2,
+        name: '装甲列車強襲作戦',
+        desc: '鉄橋へ接近する重武装の装甲列車と前線指令部トーチカを撃破せよ。',
+        targets: [
+          { type: 'train', name: '重装甲列車', x: -320, z: 0, hp: 160, radius: 28, score: 3000, speed: 18 },
+          { type: 'bunker', name: '前線指令部トーチカ', x: 260, z: -260, hp: 170, radius: 24, score: 2500 },
+          { type: 'tank', name: '重戦車小隊 1号車', x: 160, z: 210, hp: 95, radius: 18, score: 1400, speed: 14 },
+          { type: 'tank', name: '重戦車小隊 2号車', x: 230, z: 210, hp: 95, radius: 18, score: 1400, speed: 14 },
+          { type: 'flak', name: '88mm高射砲陣地 北', x: -220, z: -240, hp: 75, radius: 20, score: 1200 },
+          { type: 'flak', name: '88mm高射砲陣地 南', x: 140, z: -150, hp: 75, radius: 20, score: 1200 },
+          { type: 'fuel', name: '弾薬・燃料集積所', x: -340, z: 260, hp: 90, radius: 26, score: 1600 }
+        ]
+      },
+      {
+        stage: 3,
+        name: '要塞防衛線突破作戦',
+        desc: '濃密な対空砲網を「ジェリコのラッパ」で恐慌に陥れ、全要塞施設を殲滅せよ！',
+        targets: [
+          { type: 'bridge', name: '主力補給鉄橋', x: 0, z: 0, hp: 200, radius: 34, score: 3000 },
+          { type: 'bunker', name: '第一砲台トーチカ', x: -310, z: -280, hp: 180, radius: 24, score: 2800 },
+          { type: 'bunker', name: '第二砲台トーチカ', x: 320, z: 280, hp: 180, radius: 24, score: 2800 },
+          { type: 'train', name: '防空装甲列車', x: 380, z: 0, hp: 170, radius: 28, score: 3200, speed: -18 },
+          { type: 'fuel', name: '地下燃料貯蔵庫', x: 250, z: -290, hp: 100, radius: 26, score: 1800 },
+          { type: 'flak', name: '対空砲陣地 A', x: -160, z: -140, hp: 75, radius: 20, score: 1300 },
+          { type: 'flak', name: '対空砲陣地 B', x: 160, z: -140, hp: 75, radius: 20, score: 1300 },
+          { type: 'flak', name: '対空砲陣地 C', x: -180, z: 180, hp: 75, radius: 20, score: 1300 },
+          { type: 'flak', name: '対空砲陣地 D', x: 180, z: 180, hp: 75, radius: 20, score: 1300 }
+        ]
+      }
+    ];
+
+    let activeTargets = [];
+    const targetsGroup = new THREE.Group();
+    scene.add(targetsGroup);
+
+    function createTargetMesh(type) {
+      const group = new THREE.Group();
+      const steelMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.6, metalness: 0.5 });
+      const oliveMat = new THREE.MeshStandardMaterial({ color: 0x3f4e36, roughness: 0.65 });
+      const concreteMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.85 });
+      const redTankMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.5 });
+
+      if (type === 'bridge') {
+        // Steel Truss Railway Bridge spanning across the river at Z = 0
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(130, 3, 18), steelMat);
+        deck.position.y = 14.5;
+        group.add(deck);
+
+        // Truss arches
+        for (let bx = -50; bx <= 50; bx += 25) {
+          const arch = new THREE.Mesh(new THREE.BoxGeometry(22, 12, 16), steelMat);
+          arch.position.set(bx, 21, 0);
+          group.add(arch);
+        }
+        // Bridge piers into water
+        for (let px = -40; px <= 40; px += 40) {
+          const pier = new THREE.Mesh(new THREE.BoxGeometry(8, 22, 16), concreteMat);
+          pier.position.set(px, 4, 0);
+          group.add(pier);
+        }
+      } else if (type === 'train') {
+        // Multi-car Armored Train
+        for (let c = -1; c <= 1; c++) {
+          const car = new THREE.Mesh(new THREE.BoxGeometry(24, 6.5, 6.5), steelMat);
+          car.position.set(c * 27, 3.5, 0);
+          group.add(car);
+          const turret = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.5, 2.2, 8), oliveMat);
+          turret.position.set(c * 27, 7.5, 0);
+          group.add(turret);
+        }
+      } else if (type === 'tank') {
+        // Tank hull & turret
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(11, 3.6, 6.8), oliveMat);
+        hull.position.y = 2.0;
+        const turret = new THREE.Mesh(new THREE.BoxGeometry(5.5, 2.4, 4.6), oliveMat);
+        turret.position.set(-0.5, 4.8, 0);
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 7, 8), steelMat);
+        barrel.rotation.z = Math.PI / 2;
+        barrel.position.set(-5.2, 4.8, 0);
+        group.add(hull, turret, barrel);
+      } else if (type === 'flak') {
+        // Sandbag ring + AA Gun mount
+        const sandbag = new THREE.Mesh(new THREE.TorusGeometry(9.5, 2.2, 8, 16), concreteMat);
+        sandbag.rotation.x = Math.PI / 2;
+        sandbag.position.y = 1.6;
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, 3.0, 8), steelMat);
+        base.position.y = 1.8;
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 9, 8), steelMat);
+        barrel.rotation.z = -0.65;
+        barrel.position.set(2.2, 5.5, 0);
+        group.add(sandbag, base, barrel);
+      } else if (type === 'fuel') {
+        // Twin Large Cylindrical Fuel Storage Tanks
+        for (let ox of [-7, 7]) {
+          const tank = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6.2, 11, 16), redTankMat);
+          tank.position.set(ox, 5.5, 0);
+          const cap = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.4, 0.8, 16), steelMat);
+          cap.position.set(ox, 11.2, 0);
+          group.add(tank, cap);
+        }
+      } else if (type === 'bunker') {
+        // Heavy Concrete Command Bunker
+        const base = new THREE.Mesh(new THREE.BoxGeometry(22, 7.5, 18), concreteMat);
+        base.position.y = 3.75;
+        const cupola = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 5.5, 3.2, 10), steelMat);
+        cupola.position.y = 8.5;
+        group.add(base, cupola);
+      }
+
+      return group;
+    }
+
+    function loadStage(stageIndex) {
+      // Clear previous targets & markers
+      while (targetsGroup.children.length > 0) {
+        targetsGroup.remove(targetsGroup.children[0]);
+      }
+      document.getElementById('target-markers-layer').innerHTML = '';
+      activeTargets = [];
+
+      const stageData = STAGES[(stageIndex - 1) % STAGES.length];
+      document.getElementById('hud-stage').textContent = stageIndex;
+      document.getElementById('hud-stage-name').textContent = stageData.name;
+
+      stageData.targets.forEach((tDef, idx) => {
+        const mesh = createTargetMesh(tDef.type);
+        const startX = tDef.type === 'bridge' ? getRiverCenterX(0) : tDef.x;
+        const groundY = tDef.type === 'bridge' ? 0 : Math.max(0, getTerrainHeight(startX, tDef.z));
+        mesh.position.set(startX, groundY, tDef.z);
+        targetsGroup.add(mesh);
+
+        // Create screen-space floating badge element
+        const badge = document.createElement('div');
+        badge.className = 'absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none transition-opacity duration-150';
+        badge.innerHTML = `
+          <div class="panic-badge hidden px-1.5 py-0.5 rounded bg-purple-900/90 border border-purple-400 text-[9px] font-bold text-purple-200 mb-0.5 animate-bounce">
+            😱 PANIC! 恐慌状態
+          </div>
+          <div class="w-4 h-4 border-2 border-red-500 rotate-45 flex items-center justify-center bg-red-950/40">
+            <div class="w-1.5 h-1.5 bg-red-400"></div>
+          </div>
+          <div class="mt-1 px-1.5 py-0.2 bg-black/65 rounded text-[10px] font-bold text-red-300 whitespace-nowrap">
+            ${tDef.name}
+          </div>
+        `;
+        document.getElementById('target-markers-layer').appendChild(badge);
+
+        activeTargets.push({
+          id: idx,
+          ...tDef,
+          x: startX,
+          y: groundY,
+          maxHp: tDef.hp,
+          destroyed: false,
+          panicked: false,
+          panicTimer: 0,
+          everPanicked: false,
+          flakCooldown: 1.5 + Math.random() * 2.0,
+          mesh,
+          badge
+        });
+      });
+
+      updateTargetCounters();
+    }
+
+    // ----------------------------------------------------------------------------
+    // 6. GAME STATE, FLIGHT PHYSICS, PROJECTILES & PARTICLES
+    // ----------------------------------------------------------------------------
+    const audioEngine = new StukaAudioEngine();
+
+    const state = {
+      running: false,
+      paused: false,
+      stage: 1,
+      score: 0,
+
+      // Aircraft Physics State
+      pos: new THREE.Vector3(0, 1800, 2100),
+      quat: new THREE.Quaternion(),
+      speed: 95, // m/s (~342 km/h)
+      throttle: 0.85,
+      diveBrakes: false,
+      sirenEnabled: true,
+      invertPitch: true, // Standard flight stick: W / Up pushes nose down into dive
+
+      // Ordnance & Health
+      sc500Count: 1,
+      sc50Count: 4,
+      salvoMode: false,
+      mgAmmo: 1000,
+      hp: 100,
+      trapezeSwing: 0,
+
+      // Camera Mode: 0 = Chase, 1 = Cockpit, 2 = Bomb Cam
+      camMode: 0,
+      activeBombCamTarget: null,
+
+      // Stage Metrics
+      bombsDropped: 0,
+      bombsHit: 0,
+      maxDiveSpeedKmh: 0,
+      maxSirenDb: 0,
+      panicInflictedCount: 0,
+
+      // Current telemetry
+      currentDiveAngle: 0,
+      currentGForce: 1.0,
+      sirenRpm: 0,
+      sirenDb: 0,
+      predictedImpact: new THREE.Vector3(),
+      isLockedOn: false
+    };
+
+    // Active dynamic entities
+    const activeBombs = [];
+    const activeBullets = [];
+    const activeFlakBursts = [];
+    const activeParticles = [];
+
+    // Input tracking
+    const keys = {};
+    let mouseFiring = false;
+
+    function resetAircraftToStartAltitude(fullHeal = true) {
+      state.pos.set(0, 1800, 2250);
+      state.quat.identity(); // Facing -Z (toward the river and targets at Z = 0)
+      state.speed = 92; // ~331 km/h
+      state.throttle = 0.85;
+      state.diveBrakes = false;
+      state.sc500Count = 1;
+      state.sc50Count = 4;
+      state.mgAmmo = 1000;
+      state.trapezeSwing = 0;
+      state.activeBombCamTarget = null;
+      if (fullHeal) {
+        state.hp = 100;
+      } else {
+        state.hp = Math.min(100, state.hp + 35);
+      }
+
+      // Restore visual bomb meshes on Stuka
+      stuka.sc500Mesh.visible = true;
+      stuka.sc50Meshes.forEach((m) => (m.visible = true));
+      updateOrdnanceHUD();
+    }
+
+    // ----------------------------------------------------------------------------
+    // 7. BOMBING, MACHINE GUNS & EXPLOSION EFFECTS
+    // ----------------------------------------------------------------------------
+    function dropBomb() {
+      if (!state.running || state.paused) return;
+
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.quat);
+      const down = new THREE.Vector3(0, -1, 0).applyQuaternion(state.quat);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(state.quat);
+      const initialVel = forward.clone().multiplyScalar(state.speed).addScaledVector(down, 6);
+
+      let droppedAny = false;
+
+      if (state.salvoMode) {
+        // Drop ALL remaining bombs in a devastating salvo!
+        if (state.sc500Count > 0) {
+          spawnFallingBomb('SC500', state.pos.clone().addScaledVector(down, 1.8), initialVel.clone(), 160, 48);
+          state.sc500Count = 0;
+          stuka.sc500Mesh.visible = false;
+          state.trapezeSwing = 1.0;
+          droppedAny = true;
+        }
+        while (state.sc50Count > 0) {
+          const idx = 4 - state.sc50Count;
+          const sideOffset = (idx % 2 === 0 ? -1 : 1) * (3.2 + Math.floor(idx / 2) * 0.9);
+          const spawnPos = state.pos.clone().addScaledVector(right, sideOffset).addScaledVector(down, 1.2);
+          const spreadVel = initialVel.clone().addScaledVector(right, sideOffset * 0.6);
+          spawnFallingBomb('SC50', spawnPos, spreadVel, 75, 28);
+          stuka.sc50Meshes[idx].visible = false;
+          state.sc50Count--;
+          droppedAny = true;
+        }
+      } else {
+        // Single Drop Mode: Prioritize SC500 centerline bomb first, then SC50 wing bombs
+        if (state.sc500Count > 0) {
+          spawnFallingBomb('SC500', state.pos.clone().addScaledVector(down, 1.8), initialVel.clone(), 160, 48);
+          state.sc500Count = 0;
+          stuka.sc500Mesh.visible = false;
+          state.trapezeSwing = 1.0;
+          droppedAny = true;
+        } else if (state.sc50Count > 0) {
+          const idx = 4 - state.sc50Count;
+          const sideOffset = (idx % 2 === 0 ? -1 : 1) * (3.2 + Math.floor(idx / 2) * 0.9);
+          const spawnPos = state.pos.clone().addScaledVector(right, sideOffset).addScaledVector(down, 1.2);
+          spawnFallingBomb('SC50', spawnPos, initialVel.clone(), 75, 28);
+          stuka.sc50Meshes[idx].visible = false;
+          state.sc50Count--;
+          droppedAny = true;
+        }
+      }
+
+      if (droppedAny) {
+        audioEngine.playBombRelease();
+        updateOrdnanceHUD();
+        if (state.sc500Count === 0 && state.sc50Count === 0) {
+          showTacticalBanner('全弾投下完了！ [R] キーで再上昇・補給可能');
+        }
+      } else {
+        showTacticalBanner('残弾なし！ [R] キーで再上昇・補給してください');
+      }
+    }
+
+    function spawnFallingBomb(type, pos, vel, damage, blastRadius) {
+      const mesh = createBombMesh(type === 'SC500' ? 1.15 : 0.7);
+      mesh.position.copy(pos);
+      scene.add(mesh);
+
+      const bombObj = {
+        type,
+        pos,
+        vel,
+        damage,
+        blastRadius,
+        mesh,
+        age: 0
+      };
+      activeBombs.push(bombObj);
+      state.bombsDropped++;
+
+      // If Bomb Cam mode is active, track the latest bomb
+      if (state.camMode === 2) {
+        state.activeBombCamTarget = bombObj;
+      }
+    }
+
+    let mgFireCooldown = 0;
+    function fireMachineGuns(dt) {
+      mgFireCooldown -= dt;
+      if (mgFireCooldown > 0 || state.mgAmmo <= 0) return;
+      mgFireCooldown = 0.065; // ~900 RPM twin MG 17
+
+      state.mgAmmo = Math.max(0, state.mgAmmo - 2);
+      audioEngine.playMachineGunShot();
+
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.quat);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(state.quat);
+
+      // Twin wing-root 7.92mm tracers
+      [-1.4, 1.4].forEach((offset) => {
+        const bPos = state.pos.clone().addScaledVector(right, offset).addScaledVector(forward, 3.2);
+        const bVel = forward.clone().multiplyScalar(state.speed + 520);
+
+        const tracerGeo = new THREE.BoxGeometry(0.18, 0.18, 4.5);
+        const tracerMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+        const mesh = new THREE.Mesh(tracerGeo, tracerMat);
+        mesh.position.copy(bPos);
+        mesh.quaternion.copy(state.quat);
+        scene.add(mesh);
+
+        activeBullets.push({ pos: bPos, vel: bVel, mesh, life: 1.6 });
+      });
+
+      updateOrdnanceHUD();
+    }
+
+    function spawnExplosion(pos, scale = 1.0) {
+      audioEngine.playExplosion(Math.min(1.4, 0.75 + scale * 0.4));
+
+      // Fireball sphere
+      const fireGeo = new THREE.SphereGeometry(6 * scale, 12, 10);
+      const fireMat = new THREE.MeshBasicMaterial({
+        color: 0xff6b00,
+        transparent: true,
+        opacity: 0.95
+      });
+      const fireMesh = new THREE.Mesh(fireGeo, fireMat);
+      fireMesh.position.copy(pos);
+      scene.add(fireMesh);
+      activeParticles.push({
+        mesh: fireMesh,
+        vel: new THREE.Vector3(0, 12 * scale, 0),
+        grow: 22 * scale,
+        life: 0.65,
+        maxLife: 0.65
+      });
+
+      // Dark smoke plumes & debris
+      const smokeGeo = new THREE.DodecahedronGeometry(5 * scale, 0);
+      for (let i = 0; i < 10; i++) {
+        const sMat = new THREE.MeshBasicMaterial({
+          color: i % 2 === 0 ? 0x1f2937 : 0x4b5563,
+          transparent: true,
+          opacity: 0.85
+        });
+        const sMesh = new THREE.Mesh(smokeGeo, sMat);
+        sMesh.position.copy(pos);
+        scene.add(sMesh);
+
+        const vel = new THREE.Vector3(
+          (Math.random() - 0.5) * 45 * scale,
+          (15 + Math.random() * 40) * scale,
+          (Math.random() - 0.5) * 45 * scale
+        );
+        activeParticles.push({
+          mesh: sMesh,
+          vel,
+          grow: 14 * scale,
+          life: 1.4 + Math.random() * 0.8,
+          maxLife: 2.2
+        });
+      }
+    }
+
+    function detonateBomb(bomb) {
+      const isSC500 = bomb.type === 'SC500';
+      spawnExplosion(bomb.pos, isSC500 ? 1.85 : 1.05);
+
+      let hitAnyTarget = false;
+      activeTargets.forEach((t) => {
+        if (t.destroyed) return;
+        const dist = Math.hypot(bomb.pos.x - t.x, bomb.pos.z - t.z);
+        const effectiveRadius = bomb.blastRadius + t.radius;
+        if (dist <= effectiveRadius) {
+          hitAnyTarget = true;
+          const falloff = 1 - (dist / effectiveRadius) * 0.45;
+          const dmg = bomb.damage * falloff;
+          damageTarget(t, dmg);
+        }
+      });
+
+      if (hitAnyTarget) {
+        state.bombsHit++;
+      }
+    }
+
+    function damageTarget(target, dmg) {
+      if (target.destroyed) return;
+      target.hp -= dmg;
+
+      // Secondary fuel tank chain explosion!
+      if (target.hp <= 0) {
+        target.hp = 0;
+        target.destroyed = true;
+        target.badge.style.display = 'none';
+
+        const bonus = target.panicked ? Math.round(target.score * 1.25) : target.score;
+        state.score += bonus;
+        document.getElementById('hud-score').textContent = state.score.toLocaleString();
+
+        const extraScale = target.type === 'fuel' ? 2.3 : 1.5;
+        spawnExplosion(new THREE.Vector3(target.x, target.y + 4, target.z), extraScale);
+
+        // Darken & collapse target mesh
+        target.mesh.traverse((child) => {
+          if (child.isMesh) {
+            child.material = new THREE.MeshLambertMaterial({ color: 0x18181b });
+          }
+        });
+        target.mesh.scale.y = 0.25;
+
+        showTacticalBanner(`撃破！ ${target.name} (+${bonus} pts)`);
+        updateTargetCounters();
+        checkStageClear();
+      }
+    }
+
+    function updateTargetCounters() {
+      const remaining = activeTargets.filter((t) => !t.destroyed).length;
+      document.getElementById('hud-targets-left').textContent = remaining;
+      document.getElementById('hud-targets-total').textContent = activeTargets.length;
+    }
+
+    function checkStageClear() {
+      const remaining = activeTargets.filter((t) => !t.destroyed).length;
+      if (remaining === 0 && state.running) {
+        setTimeout(() => {
+          showStageResult(true);
+        }, 1200);
+      }
+    }
+
+    // ----------------------------------------------------------------------------
+    // 8. BALLISTIC TRAJECTORY PREDICTION (Real-Time Ground Reticle)
+    // ----------------------------------------------------------------------------
+    function updateBallisticPrediction() {
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.quat);
+      const down = new THREE.Vector3(0, -1, 0).applyQuaternion(state.quat);
+
+      const simPos = state.pos.clone().addScaledVector(down, 1.5);
+      const simVel = forward.clone().multiplyScalar(state.speed).addScaledVector(down, 6);
+      const gravity = 28.0; // Tuned flight-sim gravity for crisp dive-bombing ballistics
+      const dtStep = 0.08;
+
+      for (let step = 0; step < 180; step++) {
+        simVel.y -= gravity * dtStep;
+        simPos.addScaledVector(simVel, dtStep);
+        const groundY = Math.max(0, getTerrainHeight(simPos.x, simPos.z));
+        if (simPos.y <= groundY) {
+          simPos.y = groundY + 0.8;
+          break;
+        }
+      }
+
+      state.predictedImpact.copy(simPos);
+      impactMarkerGroup.position.copy(simPos);
+
+      // Scale reticle subtly with altitude so it remains easy to see from 1,800m
+      const dist = state.pos.distanceTo(simPos);
+      const scale = Math.max(0.7, Math.min(2.6, dist / 650));
+      impactMarkerGroup.scale.setScalar(scale);
+
+      // Check if any living target is near the predicted impact point
+      let nearTarget = false;
+      for (const t of activeTargets) {
+        if (!t.destroyed && Math.hypot(simPos.x - t.x, simPos.z - t.z) <= t.radius + 36) {
+          nearTarget = true;
+          break;
+        }
+      }
+
+      const goodDive = state.currentDiveAngle >= 62 && state.currentDiveAngle <= 88;
+      state.isLockedOn = nearTarget && goodDive && (state.sc500Count > 0 || state.sc50Count > 0);
+
+      const lockBadge = document.getElementById('dive-lock-badge');
+      if (state.isLockedOn) {
+        outerRingMat.color.setHex(0xef4444);
+        innerDotMat.color.setHex(0xef4444);
+        lockBadge.classList.remove('hidden');
+      } else if (goodDive) {
+        outerRingMat.color.setHex(0x10b981);
+        innerDotMat.color.setHex(0x10b981);
+        lockBadge.classList.add('hidden');
+      } else {
+        outerRingMat.color.setHex(0xfacc15);
+        innerDotMat.color.setHex(0xfacc15);
+        lockBadge.classList.add('hidden');
+      }
+    }
+
+    // ----------------------------------------------------------------------------
+    // 9. MAIN PHYSICS & SIMULATION STEP
+    // ----------------------------------------------------------------------------
+    function updateSimulation(dt) {
+      if (!state.running || state.paused) return;
+
+      // 1. Flight Control Inputs
+      let pitchInput = 0;
+      let rollInput = 0;
+      let yawInput = 0;
+
+      const upPressed = keys['KeyW'] || keys['ArrowUp'];
+      const downPressed = keys['KeyS'] || keys['ArrowDown'];
+      if (upPressed) pitchInput += state.invertPitch ? -1 : 1;
+      if (downPressed) pitchInput += state.invertPitch ? 1 : -1;
+
+      if (keys['KeyA'] || keys['ArrowLeft']) rollInput += 1;
+      if (keys['KeyD'] || keys['ArrowRight']) rollInput -= 1;
+
+      if (keys['KeyQ']) yawInput += 1;
+      if (keys['KeyE']) yawInput -= 1;
+
+      if (keys['ShiftLeft'] || keys['ShiftRight']) {
+        state.throttle = Math.min(1.0, state.throttle + 0.55 * dt);
+      }
+      if (keys['ControlLeft'] || keys['ControlRight']) {
+        state.throttle = Math.max(0.0, state.throttle - 0.55 * dt);
+      }
+
+      // Smoothly apply local angular rotations
+      const pitchRate = 1.25 * dt;
+      const rollRate = 2.15 * dt;
+      const yawRate = 0.65 * dt;
+
+      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitchInput * pitchRate);
+      const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), rollInput * rollRate);
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawInput * yawRate);
+
+      state.quat.multiply(qPitch).multiply(qRoll).multiply(qYaw).normalize();
+
+      // Calculate Forward Vector & Dive Angle
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.quat);
+      // Dive angle: 0 when level, +90 when pointing straight down
+      const diveAngleRad = Math.asin(Math.max(-1, Math.min(1, -forward.y)));
+      state.currentDiveAngle = Math.round((diveAngleRad * 180) / Math.PI);
+
+      // G-Force estimation (higher when pulling up at high speed)
+      const pullUpFactor = pitchInput > 0 ? pitchInput * (state.speed / 95) * 3.8 : 0;
+      state.currentGForce = 1.0 + Math.cos(diveAngleRad) * 0.2 + pullUpFactor;
+
+      // 2. Aerodynamic Thrust, Gravity Acceleration & Dive Brake Drag
+      const engineThrust = state.throttle * 46.0;
+      const gravityAccel = -forward.y * 44.0; // Diving accelerates strongly!
+      // Dive brakes drastically cap terminal speed for controlled 70-85 deg dive bombing
+      const dragCoeff = state.diveBrakes ? 0.0052 : 0.0023;
+      const aeroDrag = dragCoeff * state.speed * state.speed;
+
+      state.speed += (engineThrust + gravityAccel - aeroDrag) * dt;
+      state.speed = Math.max(48, Math.min(198, state.speed)); // 172 km/h to 712 km/h
+
+      const speedKmh = Math.round(state.speed * 3.6);
+      if (state.currentDiveAngle > 35 && speedKmh > state.maxDiveSpeedKmh) {
+        state.maxDiveSpeedKmh = speedKmh;
+      }
+
+      // Move aircraft
+      state.pos.addScaledVector(forward, state.speed * dt);
+
+      // Soft theater boundary turn-back so player never flies out of the 4km battle zone
+      if (Math.abs(state.pos.x) > 3200 || Math.abs(state.pos.z) > 3200) {
+        const toCenter = new THREE.Vector3(-state.pos.x, 0, -state.pos.z).normalize();
+        const targetQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), toCenter);
+        state.quat.slerp(targetQuat, 0.8 * dt);
+        showTacticalBanner('作戦空域外縁 — 戦場中心へ自動旋回中');
+      }
+
+      // 3. Terrain & Water Collision Check
+      const groundHeight = Math.max(0, getTerrainHeight(state.pos.x, state.pos.z));
+      const aglAltitude = Math.max(0, Math.round(state.pos.y - groundHeight));
+
+      if (state.pos.y <= groundHeight + 2.2) {
+        spawnExplosion(state.pos, 2.2);
+        showStageResult(false);
+        return;
+      }
+
+      // 4. Update Stuka 3D Model Animations
+      stuka.root.position.copy(state.pos);
+      stuka.root.quaternion.copy(state.quat);
+
+      // Main 3-blade propeller spin
+      stuka.propeller.rotation.z += (18 + state.throttle * 38) * dt;
+
+      // Dive brakes deployment animation (0 to 90 deg)
+      const targetBrakeAngle = state.diveBrakes ? Math.PI / 2 : 0;
+      stuka.diveBrakes.forEach((brake) => {
+        brake.rotation.x += (targetBrakeAngle - brake.rotation.x) * Math.min(1, 10 * dt);
+      });
+
+      // Trapeze bomb crutch swing animation when SC500 releases
+      if (state.trapezeSwing > 0) {
+        stuka.trapezePivot.rotation.x = -Math.sin(state.trapezeSwing * Math.PI) * 0.95;
+        state.trapezeSwing = Math.max(0, state.trapezeSwing - 1.4 * dt);
+      } else {
+        stuka.trapezePivot.rotation.x = 0;
+      }
+
+      // 5. Update Jericho's Trumpet Sound, Windmills & Vortex Rings
+      const sirenStats = audioEngine.update(
+        speedKmh,
+        state.throttle,
+        state.diveBrakes,
+        state.sirenEnabled,
+        state.paused
+      );
+      state.sirenRpm = sirenStats.rpm;
+      state.sirenDb = sirenStats.db;
+      if (state.sirenDb > state.maxSirenDb) {
+        state.maxSirenDb = state.sirenDb;
+      }
+
+      const sirenSpinRate = (state.sirenRpm / 60) * Math.PI * 2;
+      stuka.wingSirenProps.forEach((prop) => {
+        prop.rotation.z += sirenSpinRate * dt;
+      });
+      const vortexOpacity = state.sirenDb > 82 ? Math.min(0.65, (state.sirenDb - 82) / 65) : 0;
+      stuka.sirenVortexRings.forEach((ring, i) => {
+        ring.material.opacity = vortexOpacity;
+        const pulse = 1 + Math.sin(performance.now() * 0.025 + i) * 0.25;
+        ring.scale.setScalar(pulse);
+      });
+
+      // 6. Machine Gun Continuous Fire
+      if (keys['KeyF'] || mouseFiring) {
+        fireMachineGuns(dt);
+      }
+
+      // 7. Update Ground Targets, Jericho Panic Effect & Enemy Flak Fire
+      updateTargetsAndFlak(dt);
+
+      // 8. Update Falling Bombs, Bullets, Flak Bursts & Particles
+      updateProjectilesAndParticles(dt);
+
+      // 9. Update Ballistic Impact Reticle
+      updateBallisticPrediction();
+
+      // 10. Update Camera
+      updateCamera(dt, speedKmh);
+
+      // 11. Update HUD & Warnings
+      updateHUD(speedKmh, aglAltitude);
+    }
+
+    function updateTargetsAndFlak(dt) {
+      const sirenPanicActive = state.sirenEnabled && state.sirenDb >= 96;
+
+      activeTargets.forEach((t) => {
+        if (t.destroyed) return;
+
+        // Move mobile targets (tanks & armored train)
+        if (t.speed) {
+          const moveSpeed = t.panicked ? t.speed * 0.35 : t.speed;
+          t.x += moveSpeed * dt;
+          if (t.type === 'train') {
+            if (t.x > 460) t.speed = -Math.abs(t.speed);
+            if (t.x < -460) t.speed = Math.abs(t.speed);
+          } else {
+            if (Math.abs(t.x) > 550) t.speed = -t.speed;
+          }
+          t.y = Math.max(0, getTerrainHeight(t.x, t.z));
+          t.mesh.position.set(t.x, t.y, t.z);
+        }
+
+        // Jericho's Trumpet Psychological PANIC Check
+        const distToStuka = Math.hypot(state.pos.x - t.x, state.pos.z - t.z);
+        if (sirenPanicActive && distToStuka < 1350 && state.pos.y < 1450) {
+          t.panicked = true;
+          t.panicTimer = 3.0;
+          if (!t.everPanicked) {
+            t.everPanicked = true;
+            state.panicInflictedCount++;
+          }
+        } else if (t.panicTimer > 0) {
+          t.panicTimer -= dt;
+          if (t.panicTimer <= 0) t.panicked = false;
+        }
+
+        // Enemy Flak Battery Firing Logic
+        if (t.type === 'flak' && distToStuka < 2400) {
+          t.flakCooldown -= dt;
+          if (t.flakCooldown <= 0) {
+            // Panicked Flak crews fire slower and wildly inaccurately!
+            t.flakCooldown = t.panicked ? 1.8 + Math.random() * 1.2 : 0.75 + Math.random() * 0.65;
+            spawnFlakBurst(t);
+          }
+        }
+      });
+    }
+
+    function spawnFlakBurst(flakBattery) {
+      // Aim ahead of Stuka, with huge scatter if panicked
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.quat);
+      const scatter = flakBattery.panicked ? 240 : 68;
+      const burstPos = state.pos
+        .clone()
+        .addScaledVector(forward, state.speed * 0.45)
+        .add(
+          new THREE.Vector3(
+            (Math.random() - 0.5) * scatter,
+            (Math.random() - 0.5) * scatter,
+            (Math.random() - 0.5) * scatter
+          )
+        );
+
+      // Black flak cloud + orange flash
+      const puffGeo = new THREE.DodecahedronGeometry(11, 0);
+      const puffMat = new THREE.MeshBasicMaterial({
+        color: 0x18181b,
+        transparent: true,
+        opacity: 0.85
+      });
+      const mesh = new THREE.Mesh(puffGeo, puffMat);
+      mesh.position.copy(burstPos);
+      scene.add(mesh);
+
+      activeFlakBursts.push({ mesh, life: 2.2, maxLife: 2.2 });
+
+      // Check flak shrapnel proximity damage
+      const dist = burstPos.distanceTo(state.pos);
+      if (dist < 28) {
+        state.hp = Math.max(0, state.hp - 8);
+        flashDamageVignette();
+        if (state.hp <= 0) {
+          spawnExplosion(state.pos, 2.0);
+          showStageResult(false);
+        }
+      }
+    }
+
+    function updateProjectilesAndParticles(dt) {
+      const gravity = 28.0;
+
+      // 1. Falling Bombs
+      for (let i = activeBombs.length - 1; i >= 0; i--) {
+        const b = activeBombs[i];
+        b.age += dt;
+        b.vel.y -= gravity * dt;
+        b.pos.addScaledVector(b.vel, dt);
+        b.mesh.position.copy(b.pos);
+
+        // Orient bomb along velocity vector
+        if (b.vel.lengthSq() > 1) {
+          const dir = b.vel.clone().normalize();
+          b.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+        }
+
+        const groundY = Math.max(0, getTerrainHeight(b.pos.x, b.pos.z));
+        if (b.pos.y <= groundY) {
+          b.pos.y = groundY;
+          detonateBomb(b);
+          scene.remove(b.mesh);
+          activeBombs.splice(i, 1);
+          if (state.activeBombCamTarget === b) {
+            setTimeout(() => {
+              if (state.activeBombCamTarget === b) state.activeBombCamTarget = null;
+            }, 900);
+          }
+        }
+      }
+
+      // 2. 7.92mm MG17 Bullets
+      for (let i = activeBullets.length - 1; i >= 0; i--) {
+        const bul = activeBullets[i];
+        bul.life -= dt;
+        bul.pos.addScaledVector(bul.vel, dt);
+        bul.mesh.position.copy(bul.pos);
+
+        // Check strafing hit on ground targets
+        let hit = false;
+        for (const t of activeTargets) {
+          if (!t.destroyed && Math.hypot(bul.pos.x - t.x, bul.pos.z - t.z) < t.radius && Math.abs(bul.pos.y - t.y) < 18) {
+            damageTarget(t, 2.2);
+            hit = true;
+            break;
+          }
+        }
+
+        const groundY = Math.max(0, getTerrainHeight(bul.pos.x, bul.pos.z));
+        if (hit || bul.life <= 0 || bul.pos.y <= groundY) {
+          scene.remove(bul.mesh);
+          activeBullets.splice(i, 1);
+        }
+      }
+
+      // 3. Flak Bursts
+      for (let i = activeFlakBursts.length - 1; i >= 0; i--) {
+        const f = activeFlakBursts[i];
+        f.life -= dt;
+        f.mesh.scale.addScalar(6 * dt);
+        f.mesh.material.opacity = Math.max(0, (f.life / f.maxLife) * 0.8);
+        if (f.life <= 0) {
+          scene.remove(f.mesh);
+          activeFlakBursts.splice(i, 1);
+        }
+      }
+
+      // 4. Explosion Fire & Smoke Particles
+      for (let i = activeParticles.length - 1; i >= 0; i--) {
+        const p = activeParticles[i];
+        p.life -= dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+        p.mesh.scale.addScalar((p.grow / 12) * dt);
+        p.mesh.material.opacity = Math.max(0, p.life / p.maxLife);
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          activeParticles.splice(i, 1);
+        }
+      }
+    }
+
+    // ----------------------------------------------------------------------------
+    // 10. CAMERA SYSTEM (Chase View, Cockpit Revi Gunsight View, Bomb Cam)
+    // ----------------------------------------------------------------------------
+    function updateCamera(dt, speedKmh) {
+      const gunsightEl = document.getElementById('revi-gunsight');
+
+      // Mode 2: Bomb Tracking Camera (when a bomb is falling)
+      if (state.camMode === 2 && state.activeBombCamTarget) {
+        gunsightEl.style.display = 'none';
+        stuka.root.visible = true;
+        const bPos = state.activeBombCamTarget.pos;
+        const camOffset = new THREE.Vector3(0, 14, 24);
+        camera.position.lerp(bPos.clone().add(camOffset), Math.min(1, 10 * dt));
+        camera.lookAt(bPos.clone().add(new THREE.Vector3(0, -12, -15)));
+        return;
+      }
+
+      // Mode 1: Cockpit View (Inside greenhouse canopy with Revi C/12D Gunsight)
+      if (state.camMode === 1) {
+        gunsightEl.style.display = 'block';
+        stuka.root.visible = true;
+        // Position camera at pilot's eye level inside canopy
+        const eyeOffset = new THREE.Vector3(0, 1.15, -0.35).applyQuaternion(state.quat);
+        const lookAhead = new THREE.Vector3(0, 0.85, -30).applyQuaternion(state.quat);
+        camera.position.copy(state.pos).add(eyeOffset);
+        camera.quaternion.copy(state.quat);
+        camera.fov = 64 + Math.max(0, (speedKmh - 340) / 30);
+        camera.updateProjectionMatrix();
+        return;
+      }
+
+      // Mode 0: Dynamic Chase View
+      gunsightEl.style.display = 'none';
+      stuka.root.visible = true;
+
+      const chaseOffset = new THREE.Vector3(0, 4.2, 16.5).applyQuaternion(state.quat);
+      const desiredCamPos = state.pos.clone().add(chaseOffset);
+
+      // Subtle aerodynamic buffeting / camera shake when Jericho's Trumpet screams
+      if (state.sirenDb > 95) {
+        const shake = ((state.sirenDb - 95) / 35) * 0.22;
+        desiredCamPos.x += (Math.random() - 0.5) * shake;
+        desiredCamPos.y += (Math.random() - 0.5) * shake;
+      }
+
+      camera.position.lerp(desiredCamPos, Math.min(1, 14 * dt));
+      const lookTarget = state.pos.clone().add(new THREE.Vector3(0, 0.6, -24).applyQuaternion(state.quat));
+      camera.lookAt(lookTarget);
+
+      // Dynamic FOV speed sensation
+      camera.fov = 58 + Math.max(0, (speedKmh - 300) / 22);
+      camera.updateProjectionMatrix();
+    }
+
+    // ----------------------------------------------------------------------------
+    // 11. HUD, WAVEFORM VISUALIZER, MINIMAP & SCREEN MARKERS
+    // ----------------------------------------------------------------------------
+    const waveCanvas = document.getElementById('siren-wave-canvas');
+    const waveCtx = waveCanvas.getContext('2d');
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    const minimapCtx = minimapCanvas.getContext('2d');
+    let damageFlashTimer = 0;
+
+    function flashDamageVignette() {
+      damageFlashTimer = 0.4;
+    }
+
+    function updateHUD(speedKmh, aglAltitude) {
+      // Airspeed
+      const speedEl = document.getElementById('hud-speed');
+      speedEl.textContent = speedKmh;
+      speedEl.className = `font-mono-tech text-xl sm:text-2xl font-bold leading-none my-0.5 ${
+        speedKmh > 600 ? 'text-red-400' : speedKmh > 420 ? 'text-amber-400' : 'text-white'
+      }`;
+      document.getElementById('hud-speed-bar').style.width = `${Math.min(100, (speedKmh / 680) * 100)}%`;
+
+      // Dive Angle
+      const diveEl = document.getElementById('hud-dive-angle');
+      const diveZoneEl = document.getElementById('hud-dive-zone');
+      diveEl.textContent = `${state.currentDiveAngle}°`;
+      if (state.currentDiveAngle >= 65 && state.currentDiveAngle <= 88) {
+        diveEl.className = 'font-mono-tech text-xl sm:text-2xl font-bold text-emerald-400 leading-none my-0.5';
+        diveZoneEl.textContent = '最適急降下角';
+        diveZoneEl.className = 'text-[9px] text-emerald-400 font-bold';
+      } else if (state.currentDiveAngle > 25) {
+        diveEl.className = 'font-mono-tech text-xl sm:text-2xl font-bold text-amber-300 leading-none my-0.5';
+        diveZoneEl.textContent = '急降下中';
+        diveZoneEl.className = 'text-[9px] text-amber-300 font-bold';
+      } else {
+        diveEl.className = 'font-mono-tech text-xl sm:text-2xl font-bold text-sky-300 leading-none my-0.5';
+        diveZoneEl.textContent = state.currentDiveAngle < -15 ? '上昇中' : '水平飛行';
+        diveZoneEl.className = 'text-[9px] text-slate-400 font-bold';
+      }
+      document.getElementById('hud-dive-bar').style.width = `${Math.max(0, Math.min(100, (state.currentDiveAngle / 90) * 100))}%`;
+
+      // Altitude
+      const altEl = document.getElementById('hud-alt');
+      altEl.textContent = aglAltitude;
+      altEl.className = `font-mono-tech text-xl sm:text-2xl font-bold leading-none my-0.5 ${
+        aglAltitude < 320 ? 'text-red-400' : 'text-emerald-300'
+      }`;
+      document.getElementById('hud-alt-bar').style.width = `${Math.min(100, (aglAltitude / 2000) * 100)}%`;
+
+      // Throttle & Dive Brakes
+      document.getElementById('hud-throttle').textContent = `${Math.round(state.throttle * 100)}%`;
+      const brakeEl = document.getElementById('hud-dive-brake');
+      if (state.diveBrakes) {
+        brakeEl.textContent = '展開 DEPLOYED';
+        brakeEl.className = 'font-bold text-emerald-400';
+      } else {
+        brakeEl.textContent = '格納 RETRACTED';
+        brakeEl.className = 'font-bold text-slate-400';
+      }
+
+      // Jericho's Trumpet Gauge & Waveform
+      document.getElementById('jericho-rpm').textContent = state.sirenRpm.toLocaleString();
+      document.getElementById('jericho-db').textContent = state.sirenDb;
+      const jerichoCard = document.getElementById('jericho-hud-card');
+      const jerichoBadge = document.getElementById('jericho-status-badge');
+
+      if (!state.sirenEnabled) {
+        jerichoBadge.textContent = '装備OFF';
+        jerichoBadge.className = 'text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 font-bold';
+        jerichoCard.classList.remove('siren-screaming');
+      } else if (state.sirenDb >= 96) {
+        jerichoBadge.textContent = '最大咆哮 PANIC!';
+        jerichoBadge.className = 'text-[9px] px-1.5 py-0.5 rounded bg-red-600 text-white font-bold';
+        jerichoCard.classList.add('siren-screaming');
+      } else if (state.sirenDb > 0) {
+        jerichoBadge.textContent = '回転・吹鳴中';
+        jerichoBadge.className = 'text-[9px] px-1.5 py-0.5 rounded bg-amber-600 text-white font-bold';
+        jerichoCard.classList.remove('siren-screaming');
+      } else {
+        jerichoBadge.textContent = '待機 (340km/h~)';
+        jerichoBadge.className = 'text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-bold';
+        jerichoCard.classList.remove('siren-screaming');
+      }
+
+      drawSirenWaveform();
+      drawMinimap();
+      updateTargetScreenMarkers();
+
+      // Pull-Up & Stall Warnings + G-Force Blackout Vignette
+      const pullupEl = document.getElementById('warning-pullup');
+      if (aglAltitude < 340 && state.currentDiveAngle > 22) {
+        pullupEl.classList.remove('hidden');
+        audioEngine.playPullUpAlarm();
+      } else {
+        pullupEl.classList.add('hidden');
+      }
+
+      const stallEl = document.getElementById('warning-stall');
+      if (speedKmh < 195 && aglAltitude > 30) {
+        stallEl.classList.remove('hidden');
+      } else {
+        stallEl.classList.add('hidden');
+      }
+
+      // Vignette (G-LOC Blackout + Damage Flash)
+      const vignetteEl = document.getElementById('vignette-overlay');
+      if (damageFlashTimer > 0) {
+        damageFlashTimer -= 0.016;
+        vignetteEl.style.boxShadow = 'inset 0 0 110px rgba(239, 68, 68, 0.75)';
+      } else if (state.currentGForce > 3.2) {
+        const gAlpha = Math.min(0.85, (state.currentGForce - 3.2) * 0.35);
+        vignetteEl.style.boxShadow = `inset 0 0 160px rgba(0, 0, 0, ${gAlpha})`;
+      } else {
+        vignetteEl.style.boxShadow = 'none';
+      }
+    }
+
+    function drawSirenWaveform() {
+      const w = waveCanvas.width;
+      const h = waveCanvas.height;
+      waveCtx.clearRect(0, 0, w, h);
+
+      // Center baseline
+      waveCtx.strokeStyle = 'rgba(71, 85, 105, 0.45)';
+      waveCtx.lineWidth = 1;
+      waveCtx.beginPath();
+      waveCtx.moveTo(0, h / 2);
+      waveCtx.lineTo(w, h / 2);
+      waveCtx.stroke();
+
+      if (!audioEngine.initialized || state.sirenDb <= 0) return;
+
+      audioEngine.sirenAnalyser.getByteTimeDomainData(audioEngine.waveData);
+      waveCtx.strokeStyle = state.sirenDb >= 96 ? '#ef4444' : '#f59e0b';
+      waveCtx.lineWidth = 2;
+      waveCtx.beginPath();
+
+      const sliceWidth = w / audioEngine.waveData.length;
+      let x = 0;
+      for (let i = 0; i < audioEngine.waveData.length; i++) {
+        const v = audioEngine.waveData[i] / 128.0;
+        const y = (v * h) / 2;
+        if (i === 0) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+        x += sliceWidth;
+      }
+      waveCtx.stroke();
+    }
+
+    function drawMinimap() {
+      const w = minimapCanvas.width;
+      const h = minimapCanvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const scale = w / 4200; // Covers 4.2km x 4.2km area
+
+      minimapCtx.fillStyle = '#090d12';
+      minimapCtx.fillRect(0, 0, w, h);
+
+      // Grid rings
+      minimapCtx.strokeStyle = 'rgba(51, 65, 85, 0.5)';
+      minimapCtx.lineWidth = 1;
+      minimapCtx.beginPath();
+      minimapCtx.arc(cx, cy, w * 0.25, 0, Math.PI * 2);
+      minimapCtx.arc(cx, cy, w * 0.46, 0, Math.PI * 2);
+      minimapCtx.stroke();
+
+      // River curve
+      minimapCtx.strokeStyle = '#1d4ed8';
+      minimapCtx.lineWidth = 3;
+      minimapCtx.beginPath();
+      for (let z = -2100; z <= 2100; z += 150) {
+        const rx = getRiverCenterX(z);
+        const mx = cx + rx * scale;
+        const my = cy + z * scale;
+        if (z === -2100) minimapCtx.moveTo(mx, my);
+        else minimapCtx.lineTo(mx, my);
+      }
+      minimapCtx.stroke();
+
+      // Ground Targets
+      activeTargets.forEach((t) => {
+        const tx = cx + t.x * scale;
+        const ty = cy + t.z * scale;
+        if (t.destroyed) {
+          minimapCtx.strokeStyle = '#475569';
+          minimapCtx.lineWidth = 1.5;
+          minimapCtx.beginPath();
+          minimapCtx.moveTo(tx - 2.5, ty - 2.5);
+          minimapCtx.lineTo(tx + 2.5, ty + 2.5);
+          minimapCtx.moveTo(tx + 2.5, ty - 2.5);
+          minimapCtx.lineTo(tx - 2.5, ty + 2.5);
+          minimapCtx.stroke();
+        } else {
+          minimapCtx.fillStyle = t.panicked ? '#c084fc' : '#ef4444';
+          minimapCtx.beginPath();
+          minimapCtx.arc(tx, ty, t.panicked ? 3.5 : 2.8, 0, Math.PI * 2);
+          minimapCtx.fill();
+        }
+      });
+
+      // Player Stuka Position & Heading Triangle
+      const px = cx + state.pos.x * scale;
+      const py = cy + state.pos.z * scale;
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.quat);
+      const heading = Math.atan2(forward.x, -forward.z);
+
+      minimapCtx.save();
+      minimapCtx.translate(px, py);
+      minimapCtx.rotate(heading);
+      minimapCtx.fillStyle = '#fbbf24';
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(0, -6);
+      minimapCtx.lineTo(4.5, 5);
+      minimapCtx.lineTo(0, 2.5);
+      minimapCtx.lineTo(-4.5, 5);
+      minimapCtx.closePath();
+      minimapCtx.fill();
+      minimapCtx.restore();
+    }
+
+    function updateTargetScreenMarkers() {
+      const widthHalf = window.innerWidth / 2;
+      const heightHalf = window.innerHeight / 2;
+
+      activeTargets.forEach((t) => {
+        if (t.destroyed) return;
+        const worldPos = new THREE.Vector3(t.x, t.y + 12, t.z);
+        const projected = worldPos.clone().project(camera);
+
+        // Hide if behind camera
+        if (projected.z > 1) {
+          t.badge.style.opacity = '0';
+          return;
+        }
+
+        const sx = projected.x * widthHalf + widthHalf;
+        const sy = -projected.y * heightHalf + heightHalf;
+
+        if (sx < 20 || sx > window.innerWidth - 20 || sy < 20 || sy > window.innerHeight - 20) {
+          t.badge.style.opacity = '0';
+        } else {
+          t.badge.style.opacity = '1';
+          t.badge.style.left = `${sx}px`;
+          t.badge.style.top = `${sy}px`;
+
+          const panicBadge = t.badge.querySelector('.panic-badge');
+          if (t.panicked) {
+            panicBadge.classList.remove('hidden');
+          } else {
+            panicBadge.classList.add('hidden');
+          }
+        }
+      });
+    }
+
+    function updateOrdnanceHUD() {
+      document.getElementById('hud-sc500').textContent = state.sc500Count;
+      document.getElementById('hud-sc500-m').textContent = state.sc500Count;
+      document.getElementById('bomb-sc500-icon').style.opacity = state.sc500Count > 0 ? '1' : '0.2';
+
+      document.getElementById('hud-sc50').textContent = state.sc50Count;
+      document.getElementById('hud-sc50-m').textContent = state.sc50Count;
+      const sc50Spans = document.querySelectorAll('#bomb-sc50-icons span:not(.font-mono-tech)');
+      sc50Spans.forEach((sp, idx) => {
+        sp.style.opacity = idx < state.sc50Count ? '1' : '0.2';
+      });
+
+      document.getElementById('hud-drop-mode').textContent = state.salvoMode ? '全弾斉射 SALVO' : '単発投下 SINGLE';
+      document.getElementById('hud-mg-ammo').textContent = state.mgAmmo;
+      document.getElementById('hud-hp').textContent = `${state.hp}%`;
+      document.getElementById('hud-hp-m').textContent = `${state.hp}%`;
+    }
+
+    let bannerTimeout = null;
+    function showTacticalBanner(msg) {
+      const banner = document.getElementById('tactical-banner');
+      document.getElementById('tactical-banner-text').textContent = msg;
+      banner.classList.remove('hidden');
+      if (bannerTimeout) clearTimeout(bannerTimeout);
+      bannerTimeout = setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 2800);
+    }
+
+    // ----------------------------------------------------------------------------
+    // 12. STAGE CLEAR / FAILURE RESULT MODAL & UI EVENT BINDINGS
+    // ----------------------------------------------------------------------------
+    function showStageResult(victory) {
+      state.running = false;
+      audioEngine.update(0, 0, false, false, true);
+
+      const modal = document.getElementById('result-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      const subtitle = document.getElementById('result-subtitle');
+      const title = document.getElementById('result-title');
+      const desc = document.getElementById('result-desc');
+      const rankEl = document.getElementById('result-rank');
+      const nextBtn = document.getElementById('btn-next-stage');
+
+      const accuracy = state.bombsDropped > 0 ? Math.min(100, Math.round((state.bombsHit / state.bombsDropped) * 100)) : 0;
+
+      if (victory) {
+        subtitle.textContent = `STAGE ${state.stage} CLEARED`;
+        subtitle.className = 'text-xs font-bold tracking-widest text-emerald-400 uppercase';
+        title.textContent = '作戦成功！全地上目標を撃破';
+        desc.textContent = 'スツーカの精密急降下爆撃とジェリコのラッパが敵部隊を圧倒しました。';
+        nextBtn.classList.remove('hidden');
+
+        let rank = 'B';
+        if (accuracy >= 75 && state.maxSirenDb >= 110) rank = 'S';
+        else if (accuracy >= 50) rank = 'A';
+        rankEl.textContent = rank;
+        rankEl.className = `font-display text-6xl font-black my-1 ${
+          rank === 'S' ? 'text-amber-400' : rank === 'A' ? 'text-emerald-400' : 'text-sky-400'
+        }`;
+      } else {
+        subtitle.textContent = 'AIRCRAFT LOST — MISSION FAILED';
+        subtitle.className = 'text-xs font-bold tracking-widest text-red-400 uppercase';
+        title.textContent = '機体損失・作戦失敗';
+        desc.textContent = '低高度での引き起こし遅れ、または敵対空砲火により撃墜されました。';
+        nextBtn.classList.add('hidden');
+        rankEl.textContent = 'F';
+        rankEl.className = 'font-display text-6xl font-black text-red-500 my-1';
+      }
+
+      document.getElementById('stat-accuracy').textContent = `${accuracy}% (${state.bombsHit}/${state.bombsDropped})`;
+      document.getElementById('stat-max-speed').textContent = `${state.maxDiveSpeedKmh} km/h`;
+      document.getElementById('stat-max-db').textContent = `${state.maxSirenDb} dB`;
+      document.getElementById('stat-panic-count').textContent = `${state.panicInflictedCount} 部隊`;
+      document.getElementById('stat-total-score').textContent = state.score.toLocaleString();
+    }
+
+    function startStage(stageNum) {
+      state.stage = stageNum;
+      state.bombsDropped = 0;
+      state.bombsHit = 0;
+      state.maxDiveSpeedKmh = 0;
+      state.maxSirenDb = 0;
+      state.panicInflictedCount = 0;
+
+      // Clear active projectiles
+      activeBombs.forEach((b) => scene.remove(b.mesh));
+      activeBombs.length = 0;
+      activeBullets.forEach((b) => scene.remove(b.mesh));
+      activeBullets.length = 0;
+
+      resetAircraftToStartAltitude(true);
+      loadStage(stageNum);
+
+      document.getElementById('start-modal').classList.add('hidden');
+      document.getElementById('result-modal').classList.add('hidden');
+      document.getElementById('result-modal').classList.remove('flex');
+      document.getElementById('hud-container').classList.remove('hidden');
+
+      state.running = true;
+      state.paused = false;
+      showTacticalBanner(`STAGE ${stageNum} 開始 — 目標上空へ進入せよ！`);
+    }
+
+    // Button Event Listeners
+    document.getElementById('btn-start-game').addEventListener('click', () => {
+      audioEngine.init();
+      state.invertPitch = document.getElementById('start-invert-pitch').checked;
+      document.getElementById('invert-label').textContent = state.invertPitch ? '標準(W下)' : '反転(W上)';
+      startStage(1);
+    });
+
+    document.getElementById('btn-toggle-siren').addEventListener('click', () => {
+      state.sirenEnabled = !state.sirenEnabled;
+      document.getElementById('siren-equip-label').textContent = state.sirenEnabled ? 'ON' : 'OFF';
+      document.getElementById('siren-equip-dot').className = `w-2 h-2 rounded-full ${
+        state.sirenEnabled ? 'bg-emerald-400' : 'bg-slate-500'
+      }`;
+      showTacticalBanner(`ジェリコのラッパ: ${state.sirenEnabled ? '有効化' : '解除'}`);
+    });
+
+    function cycleCameraMode() {
+      state.camMode = (state.camMode + 1) % 3;
+      const labels = ['後方', 'コックピット', '爆弾追尾'];
+      document.getElementById('cam-mode-label').textContent = labels[state.camMode];
+      showTacticalBanner(`カメラ視点: ${labels[state.camMode]}`);
+    }
+
+    document.getElementById('btn-switch-cam').addEventListener('click', cycleCameraMode);
+
+    document.getElementById('btn-invert-pitch').addEventListener('click', () => {
+      state.invertPitch = !state.invertPitch;
+      document.getElementById('invert-label').textContent = state.invertPitch ? '標準(W下)' : '反転(W上)';
+    });
+
+    document.getElementById('btn-rearm').addEventListener('click', () => {
+      if (!state.running) return;
+      resetAircraftToStartAltitude(false);
+      showTacticalBanner('戦域離脱・高度1,800mへ再上昇＆爆弾補給完了！');
+    });
+
+    document.getElementById('btn-toggle-help').addEventListener('click', () => {
+      state.paused = true;
+      const hm = document.getElementById('help-modal');
+      hm.classList.remove('hidden');
+      hm.classList.add('flex');
+    });
+
+    const closeHelp = () => {
+      state.paused = false;
+      const hm = document.getElementById('help-modal');
+      hm.classList.add('hidden');
+      hm.classList.remove('flex');
+    };
+    document.getElementById('btn-close-help').addEventListener('click', closeHelp);
+    document.getElementById('btn-resume-help').addEventListener('click', closeHelp);
+
+    document.getElementById('btn-retry-stage').addEventListener('click', () => {
+      startStage(state.stage);
+    });
+
+    document.getElementById('btn-next-stage').addEventListener('click', () => {
+      startStage(state.stage + 1);
+    });
+
+    // Keyboard & Mouse Input Listeners
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+
+      if (!state.running || state.paused) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        dropBomb();
+      } else if (e.code === 'KeyB') {
+        state.diveBrakes = !state.diveBrakes;
+        showTacticalBanner(`ダイブブレーキ: ${state.diveBrakes ? '展開 (速度制御有効)' : '格納'}`);
+      } else if (e.code === 'KeyX') {
+        state.salvoMode = !state.salvoMode;
+        updateOrdnanceHUD();
+        showTacticalBanner(`爆弾投下モード: ${state.salvoMode ? '全弾斉射 (SALVO)' : '単発投下 (SINGLE)'}`);
+      } else if (e.code === 'KeyC') {
+        cycleCameraMode();
+      } else if (e.code === 'KeyR') {
+        resetAircraftToStartAltitude(false);
+        showTacticalBanner('戦域離脱・高度1,800mへ再上昇＆爆弾補給完了！');
+      } else if (e.code === 'Digit1') state.throttle = 0.0;
+      else if (e.code === 'Digit2') state.throttle = 0.25;
+      else if (e.code === 'Digit3') state.throttle = 0.5;
+      else if (e.code === 'Digit4') state.throttle = 0.75;
+      else if (e.code === 'Digit5') state.throttle = 1.0;
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && state.running && !state.paused) {
+        mouseFiring = true;
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      mouseFiring = false;
+    });
+
+    // Window Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ----------------------------------------------------------------------------
+    // 13. MAIN RENDER LOOP
+    // ----------------------------------------------------------------------------
+    let lastTime = performance.now();
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      if (!state.running) {
+        // Gentle scenic orbit around the Stuka on the start/result screen
+        const t = now * 0.00035;
+        stuka.root.position.set(0, 1450, 900);
+        stuka.root.rotation.set(-0.08, Math.sin(t) * 0.2, Math.cos(t) * 0.15);
+        stuka.propeller.rotation.z += 28 * dt;
+        camera.position.set(Math.sin(t) * 18, 1455, 916);
+        camera.lookAt(stuka.root.position);
+      } else {
+        updateSimulation(dt);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.onload = () => {
+      requestAnimationFrame(animate);
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Dungeon Maze - 穴掘り法 1人称迷路</title>
+    <!-- Google Fonts: 洗練された視認性の高い日本語・欧文フォント -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Three.js (r128) CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        /* =========================================================
+           ベーススタイル & カラー変数 (ダーク・ダンジョンテーマ)
+        ========================================================= */
+        :root {
+            --bg-dark: #07090f;
+            --panel-bg: rgba(13, 18, 28, 0.78);
+            --panel-border: rgba(148, 163, 184, 0.22);
+            --panel-highlight: rgba(56, 189, 248, 0.35);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-gold: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-cyan: #38bdf8;
+            --btn-bg: rgba(30, 41, 59, 0.85);
+            --btn-hover: rgba(51, 65, 85, 0.95);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+
+        /* 3Dレンダリング用コンテナ */
+        #game-container {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: grab;
+        }
+
+        #game-container:active {
+            cursor: grabbing;
+        }
+
+        #game-container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 画面周辺の雰囲気を高めるビネット効果 */
+        .vignette-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(circle at center, transparent 52%, rgba(4, 6, 12, 0.72) 100%);
+            z-index: 5;
+        }
+
+        /* 中央の控えめなレティクル（視点の中心ガイド） */
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.45);
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        /* =========================================================
+           ガラスモーフィズム共通パネル
+        ========================================================= */
+        .hud-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            z-index: 20;
+        }
+
+        /* =========================================================
+           左上 HUD (タイトル・タイマー・踏破率・サイズ切替)
+        ========================================================= */
+        #hud-top-left {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            padding: 14px 16px;
+            width: 256px;
+            max-width: calc(50vw - 24px);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .hud-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+            padding-bottom: 8px;
+        }
+
+        .hud-title {
+            font-family: 'Cinzel', 'Noto Sans JP', serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #fde68a;
+            text-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .hud-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: rgba(245, 158, 11, 0.16);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            color: #fcd34d;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+
+        .stat-label {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+            letter-spacing: 0.04em;
+        }
+
+        .stat-value {
+            font-size: 1.08rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-primary);
+        }
+
+        .stat-value.emerald {
+            color: #34d399;
+        }
+
+        /* 探索プログレスバー */
+        .progress-track {
+            width: 100%;
+            height: 5px;
+            background: rgba(30, 41, 59, 0.9);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #0ea5e9, #10b981);
+            border-radius: 999px;
+            transition: width 0.25s ease;
+        }
+
+        /* 迷路サイズ切替 & 再生成コントロール */
+        .controls-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .size-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .size-btn {
+            background: var(--btn-bg);
+            color: var(--text-secondary);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            padding: 6px 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+
+        .size-btn:hover {
+            background: var(--btn-hover);
+            color: var(--text-primary);
+        }
+
+        .size-btn.active {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: rgba(56, 189, 248, 0.65);
+            color: #e0f2fe;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 9px;
+            border: 1px solid rgba(245, 158, 11, 0.45);
+            background: linear-gradient(135deg, rgba(217, 119, 6, 0.85), rgba(180, 83, 9, 0.9));
+            color: #fffbeb;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
+            transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .action-btn:hover {
+            filter: brightness(1.12);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
+            transform: translateY(-1px);
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
+        }
+
+        /* =========================================================
+           右上 ミニマップ (探索マッピング)
+        ========================================================= */
+        #minimap-wrapper {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+            width: 216px;
+        }
+
+        #minimap-wrapper.expanded {
+            width: min(390px, calc(100vw - 32px));
+        }
+
+        .minimap-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2px;
+        }
+
+        .minimap-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #cbd5e1;
+        }
+
+        .compass-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 1px 6px;
+            border-radius: 6px;
+        }
+
+        .map-toggle-btn {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            color: #cbd5e1;
+            border-radius: 7px;
+            padding: 3px 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .map-toggle-btn:hover {
+            background: rgba(51, 65, 85, 0.95);
+            color: #fff;
+            border-color: rgba(148, 163, 184, 0.5);
+        }
+
+        .minimap-canvas-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #05070c;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.85);
+        }
+
+        #minimap-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .minimap-legend {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            padding: 0 2px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* =========================================================
+           下部 操作ガイド
+        ========================================================= */
+        #controls-hint {
+            position: fixed;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 18px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            white-space: nowrap;
+            max-width: calc(100vw - 24px);
+            overflow-x: auto;
+        }
+
+        .hint-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #f8fafc;
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-bottom-width: 2px;
+            border-radius: 5px;
+            font-family: 'Inter', monospace;
+        }
+
+        .hint-divider {
+            width: 1px;
+            height: 14px;
+            background: rgba(148, 163, 184, 0.25);
+        }
+
+        /* =========================================================
+           モバイル / タッチ端末向けバーチャルパッド
+        ========================================================= */
+        #touch-controls {
+            display: none;
+            position: fixed;
+            bottom: 62px;
+            left: 16px;
+            right: 16px;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        .touch-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 46px);
+            grid-template-rows: repeat(3, 46px);
+            gap: 5px;
+            pointer-events: auto;
+        }
+
+        .touch-btn {
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.32);
+            border-radius: 12px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .touch-btn:active, .touch-btn.pressed {
+            background: rgba(56, 189, 248, 0.38);
+            border-color: rgba(56, 189, 248, 0.8);
+            transform: scale(0.95);
+        }
+
+        /* =========================================================
+           ゴール到達クリアモーダル
+        ========================================================= */
+        #clear-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 7, 15, 0.76);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        #clear-modal.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            width: 100%;
+            max-width: 420px;
+            background: linear-gradient(160deg, rgba(17, 24, 39, 0.96), rgba(9, 13, 22, 0.98));
+            border: 1px solid rgba(16, 185, 129, 0.42);
+            border-radius: 20px;
+            padding: 28px 26px;
+            text-align: center;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(16, 185, 129, 0.16);
+            transform: translateY(18px) scale(0.96);
+            transition: transform 0.35s cubic-bezier(0.2, 0.85, 0.25, 1);
+        }
+
+        #clear-modal.visible .modal-card {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 14px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.28), rgba(16, 185, 129, 0.05));
+            border: 1px solid rgba(52, 211, 153, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.9rem;
+            box-shadow: 0 0 24px rgba(16, 185, 129, 0.32);
+        }
+
+        .modal-title {
+            font-family: 'Cinzel', 'Noto Sans JP', serif;
+            font-size: 1.55rem;
+            font-weight: 700;
+            color: #ecfdf5;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+
+        .modal-subtitle {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 22px;
+        }
+
+        .modal-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .modal-stat-item {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 12px;
+            padding: 12px 8px;
+        }
+
+        .modal-stat-label {
+            font-size: 0.68rem;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+
+        .modal-stat-val {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #f8fafc;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .modal-stat-val.accent {
+            color: #34d399;
+        }
+
+        .modal-btn-primary {
+            width: 100%;
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(52, 211, 153, 0.55);
+            background: linear-gradient(135deg, #059669, #047857);
+            color: #ffffff;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.28);
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+
+        .modal-btn-primary:hover {
+            filter: brightness(1.12);
+            transform: translateY(-1px);
+        }
+
+        /* トースト通知（新迷路生成時などの控えめなフィードバック） */
+        #toast-msg {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translate(-50%, -18px);
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #e0f2fe;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            z-index: 60;
+        }
+
+        #toast-msg.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        /* =========================================================
+           レスポンシブ対応 (モバイル・狭幅画面)
+        ========================================================= */
+        @media (max-width: 768px) {
+            #hud-top-left {
+                top: 10px;
+                left: 10px;
+                padding: 10px 12px;
+                width: 185px;
+                gap: 8px;
+            }
+            .hud-title {
+                font-size: 0.8rem;
+            }
+            .stat-value {
+                font-size: 0.92rem;
+            }
+            #minimap-wrapper {
+                top: 10px;
+                right: 10px;
+                width: 152px;
+                padding: 8px;
+            }
+            #controls-hint {
+                bottom: 10px;
+                font-size: 0.68rem;
+                padding: 6px 12px;
+                gap: 8px;
+            }
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            #touch-controls {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 3D Three.js キャンバスコンテナ -->
+    <div id="game-container" aria-label="3D迷路ビュー"></div>
+
+    <!-- 視覚演出オーバーレイ -->
+    <div class="vignette-overlay"></div>
+    <div class="crosshair"></div>
+
+    <!-- 通知トースト -->
+    <div id="toast-msg" role="status" aria-live="polite"></div>
+
+    <!-- 左上 HUD パネル -->
+    <aside id="hud-top-left" class="hud-panel">
+        <div class="hud-header">
+            <span class="hud-title">DUNGEON MAZE</span>
+            <span class="hud-badge" id="hud-size-badge">15×15</span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">経過時間</div>
+                <div class="stat-value" id="hud-timer">00:00.0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">マッピング率</div>
+                <div class="stat-value emerald" id="hud-progress">0%</div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="hud-progress-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div class="size-selector" role="group" aria-label="迷路サイズ選択">
+                <button type="button" class="size-btn" data-size="11">11×11</button>
+                <button type="button" class="size-btn active" data-size="15">15×15</button>
+                <button type="button" class="size-btn" data-size="21">21×21</button>
+            </div>
+            <button type="button" id="btn-new-maze" class="action-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                </svg>
+                新しい迷路を生成
+            </button>
+        </div>
+    </aside>
+
+    <!-- 右上 ミニマップパネル -->
+    <aside id="minimap-wrapper" class="hud-panel">
+        <div class="minimap-header">
+            <div class="minimap-title">
+                <span>MAP</span>
+                <span class="compass-badge" id="compass-dir">N</span>
+            </div>
+            <button type="button" id="btn-toggle-map" class="map-toggle-btn" title="ミニマップ拡大縮小 (M)">拡大 [M]</button>
+        </div>
+        <div class="minimap-canvas-box">
+            <canvas id="minimap-canvas"></canvas>
+        </div>
+        <div class="minimap-legend">
+            <span class="legend-item"><span class="legend-dot" style="background:#38bdf8;"></span>開始</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span>現在地</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#10b981;"></span>ゴール</span>
+        </div>
+    </aside>
+
+    <!-- 下部 操作ガイド -->
+    <footer id="controls-hint" class="hud-panel">
+        <span class="hint-group"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> 移動</span>
+        <span class="hint-divider"></span>
+        <span class="hint-group"><span class="kbd">↑↓←→</span> / <span class="kbd">I</span><span class="kbd">J</span><span class="kbd">K</span><span class="kbd">L</span> 視点移動</span>
+        <span class="hint-divider"></span>
+        <span class="hint-group"><span class="kbd">M</span> ミニマップ拡大縮小</span>
+    </footer>
+
+    <!-- タッチデバイス用コントロール -->
+    <div id="touch-controls">
+        <div class="touch-pad" aria-label="移動パッド">
+            <div></div>
+            <button type="button" class="touch-btn" data-key="KeyW">▲</button>
+            <div></div>
+            <button type="button" class="touch-btn" data-key="KeyA">◀</button>
+            <button type="button" class="touch-btn" data-key="KeyS">▼</button>
+            <button type="button" class="touch-btn" data-key="KeyD">▶</button>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="touch-pad" aria-label="視点パッド">
+            <div></div>
+            <button type="button" class="touch-btn" data-key="ArrowUp">↑</button>
+            <div></div>
+            <button type="button" class="touch-btn" data-key="ArrowLeft">↶</button>
+            <button type="button" class="touch-btn" data-key="ArrowDown">↓</button>
+            <button type="button" class="touch-btn" data-key="ArrowRight">↷</button>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
+    <!-- ゴール到達 クリアモーダル -->
+    <div id="clear-modal" role="dialog" aria-modal="true" aria-labelledby="clear-title">
+        <div class="modal-card">
+            <div class="modal-icon">✦</div>
+            <h2 class="modal-title" id="clear-title">MAZE CLEARED!</h2>
+            <p class="modal-subtitle">ダンジョンの最奥にあるクリスタルに到達しました</p>
+            <div class="modal-stats">
+                <div class="modal-stat-item">
+                    <div class="modal-stat-label">クリアタイム</div>
+                    <div class="modal-stat-val" id="modal-time">00:00.0</div>
+                </div>
+                <div class="modal-stat-item">
+                    <div class="modal-stat-label">マッピング率</div>
+                    <div class="modal-stat-val accent" id="modal-progress">0%</div>
+                </div>
+                <div class="modal-stat-item">
+                    <div class="modal-stat-label">迷路サイズ</div>
+                    <div class="modal-stat-val" id="modal-size">15×15</div>
+                </div>
+            </div>
+            <button type="button" id="btn-play-again" class="modal-btn-primary">もう一度プレイする</button>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            /* =========================================================
+               定数・ゲーム設定
+            ========================================================= */
+            const CELL_SIZE = 4.0;          // 1マスの3Dワールド幅
+            const WALL_HEIGHT = 3.8;        // 壁の高さ
+            const EYE_HEIGHT = 1.72;        // プレイヤーの目線高さ
+            const PLAYER_RADIUS = 0.62;     // 衝突判定用のプレイヤー半径
+            const MOVE_SPEED = 6.2;         // 歩行速度 (units/sec)
+            const ROTATE_SPEED_YAW = 2.05;  // 水平視点回転速度 (rad/sec)
+            const ROTATE_SPEED_PITCH = 1.45;// 上下視点回転速度 (rad/sec)
+            const MAX_PITCH = (75 * Math.PI) / 180; // 上下視点制限 (±75度)
+            const GOAL_TRIGGER_DIST = 1.35; // ゴール判定距離
+
+            /* =========================================================
+               ゲーム状態管理オブジェクト
+            ========================================================= */
+            const state = {
+                mazeSize: 15,               // 現在の迷路サイズ (奇数: 11, 15, 21)
+                grid: [],                   // 0: 通路, 1: 壁
+                explored: [],               // 0: 未探索, 1: 視認済み, 2: 通過済み
+                totalPathCells: 1,          // 通路セルの総数
+                mappedPathCells: 0,         // マッピング済み通路セルの数
+                startCell: { x: 1, z: 1 },  // スタート座標
+                goalCell: { x: 1, z: 1 },   // ゴール座標 (BFS最遠点)
+
+                // プレイヤーの3D位置・向き
+                player: {
+                    x: 0,
+                    z: 0,
+                    yaw: 0,                 // Y軸回転 (0 = -Z北向き)
+                    pitch: 0,               // X軸回転 (上下)
+                    bobPhase: 0             // 歩行時の微妙な視点揺れ用
+                },
+
+                // タイマー・進行フラグ
+                isCleared: false,
+                elapsedTime: 0,
+                timerStarted: false,
+                isMinimapExpanded: false,
+
+                // キー入力状態 (e.code ベースでIME干渉を回避)
+                keys: Object.create(null),
+
+                // マウス / タッチによる視点ドラッグ状態
+                pointerLook: {
+                    active: false,
+                    lastX: 0,
+                    lastY: 0
+                }
+            };
+
+            /* =========================================================
+               Three.js オブジェクト参照
+            ========================================================= */
+            let scene, camera, renderer;
+            let mazeGroup = null;
+            let goalElements = null;
+            let playerLight = null;
+            let playerForwardLight = null;
+            let textures = null;
+            let lastFrameTime = 0;
+
+            /* =========================================================
+               DOM 要素参照
+            ========================================================= */
+            const dom = {
+                container: document.getElementById('game-container'),
+                minimapWrapper: document.getElementById('minimap-wrapper'),
+                minimapCanvas: document.getElementById('minimap-canvas'),
+                minimapCtx: null,
+                hudTimer: document.getElementById('hud-timer'),
+                hudProgress: document.getElementById('hud-progress'),
+                hudProgressBar: document.getElementById('hud-progress-bar'),
+                hudSizeBadge: document.getElementById('hud-size-badge'),
+                compassDir: document.getElementById('compass-dir'),
+                btnNewMaze: document.getElementById('btn-new-maze'),
+                btnToggleMap: document.getElementById('btn-toggle-map'),
+                sizeButtons: document.querySelectorAll('.size-btn'),
+                clearModal: document.getElementById('clear-modal'),
+                modalTime: document.getElementById('modal-time'),
+                modalProgress: document.getElementById('modal-progress'),
+                modalSize: document.getElementById('modal-size'),
+                btnPlayAgain: document.getElementById('btn-play-again'),
+                toastMsg: document.getElementById('toast-msg')
+            };
+
+            let toastTimer = null;
+
+            /**
+             * トースト通知を表示する (alertの代替)
+             */
+            function showToast(message) {
+                dom.toastMsg.textContent = message;
+                dom.toastMsg.classList.add('show');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => {
+                    dom.toastMsg.classList.remove('show');
+                }, 2200);
+            }
+
+            /**
+             * 経過秒数を MM:SS.d 形式にフォーマット
+             */
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                const tenths = Math.floor((seconds * 10) % 10);
+                return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${tenths}`;
+            }
+
+            /**
+             * ゴール達成時に穏やかなクリア音を生成 (Web Audio API / 外部ファイル不要)
+             */
+            function playClearChime() {
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) return;
+                    const ctx = new AudioCtx();
+                    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+                    notes.forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.value = freq;
+                        const start = ctx.currentTime + idx * 0.11;
+                        gain.gain.setValueAtTime(0.001, start);
+                        gain.gain.exponentialRampToValueAtTime(0.12, start + 0.04);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.65);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(start);
+                        osc.stop(start + 0.7);
+                    });
+                } catch (err) {
+                    // 音声再生がブロックされた場合は無視
+                }
+            }
+
+            /* =========================================================
+               1. 穴掘り法 (Recursive Backtracker) 迷路生成 & BFSゴール決定
+            ========================================================= */
+
+            /**
+             * 正統な穴掘り法で奇数サイズの迷路グリッドを生成する
+             * @param {number} size - 奇数サイズ (11, 15, 21 など)
+             * @returns {{ grid: number[][], start: {x:number,z:number}, goal: {x:number,z:number}, totalPathCells: number }}
+             */
+            function generateMazeDigging(size) {
+                // 全体を壁(1)で初期化
+                const grid = Array.from({ length: size }, () => new Array(size).fill(1));
+
+                const start = { x: 1, z: 1 };
+                grid[start.z][start.x] = 0;
+
+                // 明示的スタックによる穴掘り法（バックトラック）
+                const stack = [{ x: start.x, z: start.z }];
+                const dirs = [
+                    { dx: 0, dz: -2 }, // 北
+                    { dx: 0, dz: 2 },  // 南
+                    { dx: -2, dz: 0 }, // 西
+                    { dx: 2, dz: 0 }   // 東
+                ];
+
+                while (stack.length > 0) {
+                    const current = stack[stack.length - 1];
+
+                    // 2マス先が範囲内かつ未掘削(壁=1)の候補方向を抽出
+                    const candidates = [];
+                    for (let i = 0; i < dirs.length; i++) {
+                        const nx = current.x + dirs[i].dx;
+                        const nz = current.z + dirs[i].dz;
+                        if (nx > 0 && nx < size - 1 && nz > 0 && nz < size - 1 && grid[nz][nx] === 1) {
+                            candidates.push({
+                                nx,
+                                nz,
+                                mx: current.x + dirs[i].dx / 2,
+                                mz: current.z + dirs[i].dz / 2
+                            });
+                        }
+                    }
+
+                    if (candidates.length > 0) {
+                        // ランダムに1方向を選んで2マス掘り進める
+                        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+                        grid[chosen.mz][chosen.mx] = 0;
+                        grid[chosen.nz][chosen.nx] = 0;
+                        stack.push({ x: chosen.nx, z: chosen.nz });
+                    } else {
+                        // 行き止まりなので1つ前の分岐点へバックトラック
+                        stack.pop();
+                    }
+                }
+
+                // BFS（幅優先探索）でスタート(1,1)から最も遠い通路セルをゴールに決定
+                const dist = Array.from({ length: size }, () => new Array(size).fill(-1));
+                const queue = [{ x: start.x, z: start.z }];
+                dist[start.z][start.x] = 0;
+
+                let farthest = { x: start.x, z: start.z, d: 0 };
+                let totalPathCells = 0;
+                const stepDirs = [
+                    { dx: 0, dz: -1 },
+                    { dx: 0, dz: 1 },
+                    { dx: -1, dz: 0 },
+                    { dx: 1, dz: 0 }
+                ];
+
+                let head = 0;
+                while (head < queue.length) {
+                    const cur = queue[head++];
+                    const d = dist[cur.z][cur.x];
+                    totalPathCells++;
+
+                    if (d > farthest.d) {
+                        farthest = { x: cur.x, z: cur.z, d };
+                    }
+
+                    for (let i = 0; i < stepDirs.length; i++) {
+                        const nx = cur.x + stepDirs[i].dx;
+                        const nz = cur.z + stepDirs[i].dz;
+                        if (nx >= 0 && nx < size && nz >= 0 && nz < size && grid[nz][nx] === 0 && dist[nz][nx] === -1) {
+                            dist[nz][nx] = d + 1;
+                            queue.push({ x: nx, z: nz });
+                        }
+                    }
+                }
+
+                return {
+                    grid,
+                    start,
+                    goal: { x: farthest.x, z: farthest.z },
+                    totalPathCells
+                };
+            }
+
+            /* =========================================================
+               2. プロシージャルテクスチャ生成 (オフスクリーンCanvas)
+            ========================================================= */
+
+            /**
+             * 石レンガ風の壁テクスチャとバンプマップをプロシージャル生成
+             */
+            function createStoneWallTextures() {
+                const size = 256;
+                const colorCanvas = document.createElement('canvas');
+                colorCanvas.width = size;
+                colorCanvas.height = size;
+                const ctx = colorCanvas.getContext('2d');
+
+                const bumpCanvas = document.createElement('canvas');
+                bumpCanvas.width = size;
+                bumpCanvas.height = size;
+                const bCtx = bumpCanvas.getContext('2d');
+
+                // 目地（モルタル）ベース
+                ctx.fillStyle = '#1b202b';
+                ctx.fillRect(0, 0, size, size);
+                bCtx.fillStyle = '#1e1e1e';
+                bCtx.fillRect(0, 0, size, size);
+
+                const rows = 8;
+                const cols = 4;
+                const brickH = size / rows;
+                const brickW = size / cols;
+                const mortar = 3;
+
+                // レンガブロックを描画
+                for (let r = 0; r < rows; r++) {
+                    const offset = (r % 2) * (brickW * 0.5);
+                    for (let c = -1; c <= cols; c++) {
+                        const x = c * brickW + offset;
+                        const y = r * brickH;
+
+                        // 石ごとの色味バリエーション（青灰〜暗石色）
+                        const shade = 52 + Math.floor(Math.random() * 28);
+                        const blueTint = shade + 10 + Math.floor(Math.random() * 10);
+                        const warmTint = Math.floor(Math.random() * 8);
+
+                        ctx.fillStyle = `rgb(${shade + warmTint}, ${shade + 4}, ${blueTint})`;
+                        ctx.fillRect(x + mortar, y + mortar, brickW - mortar * 2, brickH - mortar * 2);
+
+                        // 上辺ハイライトと下辺シャドウで立体感を演出
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                        ctx.fillRect(x + mortar, y + mortar, brickW - mortar * 2, 2);
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                        ctx.fillRect(x + mortar, y + brickH - mortar - 2, brickW - mortar * 2, 2);
+
+                        // バンプマップの凸部
+                        const bVal = 175 + Math.floor(Math.random() * 55);
+                        bCtx.fillStyle = `rgb(${bVal},${bVal},${bVal})`;
+                        bCtx.fillRect(x + mortar, y + mortar, brickW - mortar * 2, brickH - mortar * 2);
+                    }
+                }
+
+                // 微細な石肌のノイズと苔のような風合いを追加
+                for (let i = 0; i < 2400; i++) {
+                    const nx = Math.random() * size;
+                    const ny = Math.random() * size;
+                    const alpha = Math.random() * 0.14;
+                    ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha * 1.4})`;
+                    ctx.fillRect(nx, ny, 2, 2);
+
+                    bCtx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.15)';
+                    bCtx.fillRect(nx, ny, 2, 2);
+                }
+
+                // 下部にわずかな湿気・暗めのグラデーション
+                const grad = ctx.createLinearGradient(0, 0, 0, size);
+                grad.addColorStop(0, 'rgba(0,0,0,0.22)');
+                grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.34)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, size, size);
+
+                const mapTex = new THREE.CanvasTexture(colorCanvas);
+                mapTex.wrapS = THREE.RepeatWrapping;
+                mapTex.wrapT = THREE.RepeatWrapping;
+
+                const bumpTex = new THREE.CanvasTexture(bumpCanvas);
+                bumpTex.wrapS = THREE.RepeatWrapping;
+                bumpTex.wrapT = THREE.RepeatWrapping;
+
+                return { map: mapTex, bumpMap: bumpTex };
+            }
+
+            /**
+             * タイル風の床テクスチャをプロシージャル生成
+             */
+            function createFloorTexture() {
+                const size = 256;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#151922';
+                ctx.fillRect(0, 0, size, size);
+
+                const tiles = 4;
+                const tileSize = size / tiles;
+                const gap = 3;
+
+                for (let r = 0; r < tiles; r++) {
+                    for (let c = 0; c < tiles; c++) {
+                        const x = c * tileSize;
+                        const y = r * tileSize;
+                        const base = 36 + ((r + c) % 2) * 7 + Math.floor(Math.random() * 10);
+
+                        ctx.fillStyle = `rgb(${base + 2}, ${base + 5}, ${base + 12})`;
+                        ctx.fillRect(x + gap, y + gap, tileSize - gap * 2, tileSize - gap * 2);
+
+                        // タイル角のわずかなベベル
+                        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeRect(x + gap + 1, y + gap + 1, tileSize - gap * 2 - 2, tileSize - gap * 2 - 2);
+                    }
+                }
+
+                // 細かな砂塵・石目ノイズ
+                for (let i = 0; i < 1600; i++) {
+                    const nx = Math.random() * size;
+                    const ny = Math.random() * size;
+                    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.12)';
+                    ctx.fillRect(nx, ny, 2, 2);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            }
+
+            /**
+             * ダンジョン天井の石板テクスチャをプロシージャル生成
+             */
+            function createCeilingTexture() {
+                const size = 256;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#0e121a';
+                ctx.fillRect(0, 0, size, size);
+
+                const cells = 2;
+                const step = size / cells;
+                for (let r = 0; r < cells; r++) {
+                    for (let c = 0; c < cells; c++) {
+                        const v = 24 + Math.floor(Math.random() * 8);
+                        ctx.fillStyle = `rgb(${v}, ${v + 3}, ${v + 9})`;
+                        ctx.fillRect(c * step + 4, r * step + 4, step - 8, step - 8);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(c * step + 6, r * step + 6, step - 12, step - 12);
+                    }
+                }
+
+                for (let i = 0; i < 900; i++) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+                    ctx.fillRect(Math.random() * size, Math.random() * size, 3, 3);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            }
+
+            /* =========================================================
+               3. Three.js シーン初期化 & 3D迷路構築
+            ========================================================= */
+
+            function initThree() {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x070a12);
+                // 雰囲気のあるダンジョンフォグで奥行を強調
+                scene.fog = new THREE.FogExp2(0x070a12, 0.088);
+
+                camera = new THREE.PerspectiveCamera(
+                    72,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    55
+                );
+                // YXZ順にすることでFPS的な水平回転(yaw)と上下回転(pitch)を自然に合成
+                camera.rotation.order = 'YXZ';
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 1.15;
+                dom.container.appendChild(renderer.domElement);
+
+                // 基本環境光 (完全な暗闇を防ぎつつ陰影を維持)
+                const ambientLight = new THREE.AmbientLight(0x3b4d70, 0.42);
+                scene.add(ambientLight);
+
+                const hemiLight = new THREE.HemisphereLight(0x607aa8, 0x1c1917, 0.35);
+                scene.add(hemiLight);
+
+                // プレイヤーが携帯するランタン風ポイントライト
+                playerLight = new THREE.PointLight(0xffcf87, 1.85, 19, 1.45);
+                scene.add(playerLight);
+
+                // 視線の少し先を柔らかく照らす補助ライト
+                playerForwardLight = new THREE.PointLight(0x93c5fd, 0.55, 13, 1.6);
+                scene.add(playerForwardLight);
+
+                // プロシージャルテクスチャを一度だけ生成して再利用
+                textures = {
+                    wall: createStoneWallTextures(),
+                    floor: createFloorTexture(),
+                    ceiling: createCeilingTexture()
+                };
+            }
+
+            /**
+             * グリッド座標 (gx, gz) を 3D ワールド中心座標に変換
+             */
+            function cellToWorld(gx, gz) {
+                return {
+                    x: (gx + 0.5) * CELL_SIZE,
+                    z: (gz + 0.5) * CELL_SIZE
+                };
+            }
+
+            /**
+             * 3Dワールド座標をグリッド座標に変換
+             */
+            function worldToCell(wx, wz) {
+                return {
+                    x: Math.floor(wx / CELL_SIZE),
+                    z: Math.floor(wz / CELL_SIZE)
+                };
+            }
+
+            /**
+             * 既存の3D迷路ジオメトリをクリーンアップ
+             */
+            function clearMazeMesh() {
+                if (!mazeGroup) return;
+                mazeGroup.traverse((obj) => {
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (Array.isArray(obj.material)) {
+                            obj.material.forEach((m) => m.dispose());
+                        } else {
+                            obj.material.dispose();
+                        }
+                    }
+                });
+                scene.remove(mazeGroup);
+                mazeGroup = null;
+                goalElements = null;
+            }
+
+            /**
+             * 現在の state.grid から3Dの壁・床・天井・スタート印・ゴールクリスタルを構築
+             */
+            function buildMaze3D() {
+                clearMazeMesh();
+                mazeGroup = new THREE.Group();
+
+                const size = state.mazeSize;
+                const worldSpan = size * CELL_SIZE;
+
+                // 1) 床メッシュ
+                const floorTex = textures.floor.clone();
+                floorTex.needsUpdate = true;
+                floorTex.repeat.set(size, size);
+                const floorGeo = new THREE.PlaneGeometry(worldSpan, worldSpan);
+                const floorMat = new THREE.MeshStandardMaterial({
+                    map: floorTex,
+                    roughness: 0.86,
+                    metalness: 0.08
+                });
+                const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+                floorMesh.rotation.x = -Math.PI / 2;
+                floorMesh.position.set(worldSpan / 2, 0, worldSpan / 2);
+                mazeGroup.add(floorMesh);
+
+                // 2) 天井メッシュ
+                const ceilTex = textures.ceiling.clone();
+                ceilTex.needsUpdate = true;
+                ceilTex.repeat.set(size, size);
+                const ceilGeo = new THREE.PlaneGeometry(worldSpan, worldSpan);
+                const ceilMat = new THREE.MeshStandardMaterial({
+                    map: ceilTex,
+                    roughness: 0.95,
+                    metalness: 0.04
+                });
+                const ceilMesh = new THREE.Mesh(ceilGeo, ceilMat);
+                ceilMesh.rotation.x = Math.PI / 2;
+                ceilMesh.position.set(worldSpan / 2, WALL_HEIGHT, worldSpan / 2);
+                mazeGroup.add(ceilMesh);
+
+                // 3) 壁ブロック (InstancedMesh で1ドローコール高速描画)
+                let wallCount = 0;
+                for (let z = 0; z < size; z++) {
+                    for (let x = 0; x < size; x++) {
+                        if (state.grid[z][x] === 1) wallCount++;
+                    }
+                }
+
+                const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+                const wallMat = new THREE.MeshStandardMaterial({
+                    map: textures.wall.map,
+                    bumpMap: textures.wall.bumpMap,
+                    bumpScale: 0.08,
+                    roughness: 0.82,
+                    metalness: 0.1
+                });
+
+                const wallInstanced = new THREE.InstancedMesh(wallGeo, wallMat, wallCount);
+                const dummy = new THREE.Object3D();
+                let idx = 0;
+                for (let z = 0; z < size; z++) {
+                    for (let x = 0; x < size; x++) {
+                        if (state.grid[z][x] === 1) {
+                            const pos = cellToWorld(x, z);
+                            dummy.position.set(pos.x, WALL_HEIGHT / 2, pos.z);
+                            dummy.updateMatrix();
+                            wallInstanced.setMatrixAt(idx++, dummy.matrix);
+                        }
+                    }
+                }
+                wallInstanced.instanceMatrix.needsUpdate = true;
+                mazeGroup.add(wallInstanced);
+
+                // 4) スタート地点のフロア魔法陣リング
+                const startWorld = cellToWorld(state.startCell.x, state.startCell.z);
+                const startRingGeo = new THREE.RingGeometry(0.85, 1.15, 32);
+                const startRingMat = new THREE.MeshBasicMaterial({
+                    color: 0x38bdf8,
+                    transparent: true,
+                    opacity: 0.45,
+                    side: THREE.DoubleSide
+                });
+                const startRing = new THREE.Mesh(startRingGeo, startRingMat);
+                startRing.rotation.x = -Math.PI / 2;
+                startRing.position.set(startWorld.x, 0.03, startWorld.z);
+                mazeGroup.add(startRing);
+
+                // 5) ゴール地点: 光る回転クリスタル + ビーコン光柱 + 台座 + ライト
+                const goalWorld = cellToWorld(state.goalCell.x, state.goalCell.z);
+                const goalGroup = new THREE.Group();
+                goalGroup.position.set(goalWorld.x, 0, goalWorld.z);
+
+                // 光のビーコン柱
+                const beaconGeo = new THREE.CylinderGeometry(0.45, 0.85, WALL_HEIGHT, 24, 1, true);
+                const beaconMat = new THREE.MeshBasicMaterial({
+                    color: 0x10b981,
+                    transparent: true,
+                    opacity: 0.16,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
+                });
+                const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+                beacon.position.y = WALL_HEIGHT / 2;
+                goalGroup.add(beacon);
+
+                // 床の光輪
+                const goalRingGeo = new THREE.RingGeometry(0.95, 1.32, 32);
+                const goalRingMat = new THREE.MeshBasicMaterial({
+                    color: 0x34d399,
+                    transparent: true,
+                    opacity: 0.75,
+                    side: THREE.DoubleSide
+                });
+                const goalRing = new THREE.Mesh(goalRingGeo, goalRingMat);
+                goalRing.rotation.x = -Math.PI / 2;
+                goalRing.position.y = 0.04;
+                goalGroup.add(goalRing);
+
+                // 中央の回転エメラルドクリスタル
+                const crystalGeo = new THREE.OctahedronGeometry(0.62, 0);
+                const crystalMat = new THREE.MeshStandardMaterial({
+                    color: 0x34d399,
+                    emissive: 0x059669,
+                    emissiveIntensity: 0.9,
+                    roughness: 0.15,
+                    metalness: 0.4
+                });
+                const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                crystal.scale.set(0.85, 1.35, 0.85);
+                crystal.position.y = 1.75;
+                goalGroup.add(crystal);
+
+                // クリスタルを囲むワイヤーフレームリング
+                const haloGeo = new THREE.TorusGeometry(0.95, 0.03, 12, 36);
+                const haloMat = new THREE.MeshBasicMaterial({
+                    color: 0xa7f3d0,
+                    transparent: true,
+                    opacity: 0.78
+                });
+                const halo = new THREE.Mesh(haloGeo, haloMat);
+                halo.position.y = 1.75;
+                goalGroup.add(halo);
+
+                // ゴール専用ポイントライト
+                const goalLight = new THREE.PointLight(0x34d399, 2.6, 15, 1.5);
+                goalLight.position.y = 1.9;
+                goalGroup.add(goalLight);
+
+                mazeGroup.add(goalGroup);
+                goalElements = { crystal, halo, beacon, goalLight };
+
+                scene.add(mazeGroup);
+            }
+
+            /* =========================================================
+               4. ゲーム開始・リセット処理
+            ========================================================= */
+
+            function startNewMaze(newSize) {
+                if (typeof newSize === 'number') {
+                    state.mazeSize = newSize;
+                }
+
+                const result = generateMazeDigging(state.mazeSize);
+                state.grid = result.grid;
+                state.startCell = result.start;
+                state.goalCell = result.goal;
+                state.totalPathCells = result.totalPathCells;
+
+                // 探索状態配列を 0 (未探索) で初期化
+                state.explored = Array.from(
+                    { length: state.mazeSize },
+                    () => new Array(state.mazeSize).fill(0)
+                );
+                state.mappedPathCells = 0;
+
+                // プレイヤーをスタートマス (1, 1) の中心に配置
+                const startPos = cellToWorld(state.startCell.x, state.startCell.z);
+                state.player.x = startPos.x;
+                state.player.z = startPos.z;
+                state.player.pitch = 0;
+                state.player.bobPhase = 0;
+
+                // 開始時に壁の目の前にならないよう、開いている通路方向を自動的に向く
+                if (state.grid[1][2] === 0) {
+                    state.player.yaw = -Math.PI / 2; // 東 (+X) 向き
+                } else if (state.grid[2][1] === 0) {
+                    state.player.yaw = Math.PI;      // 南 (+Z) 向き
+                } else {
+                    state.player.yaw = 0;
+                }
+
+                // タイマー・クリア状態リセット
+                state.isCleared = false;
+                state.elapsedTime = 0;
+                state.timerStarted = false;
+                dom.clearModal.classList.remove('visible');
+
+                // HUDサイズ表示を更新
+                dom.hudSizeBadge.textContent = `${state.mazeSize}×${state.mazeSize}`;
+                dom.sizeButtons.forEach((btn) => {
+                    btn.classList.toggle('active', Number(btn.dataset.size) === state.mazeSize);
+                });
+
+                // 3D迷路再構築 & 初期地点のマッピング
+                buildMaze3D();
+                updateExploration();
+                updateHUD();
+                resizeMinimapCanvas();
+                renderMinimap();
+
+                showToast(`${state.mazeSize}×${state.mazeSize} の新しい迷路を生成しました`);
+            }
+
+            /* =========================================================
+               5. 衝突判定付きスライド移動 & 視点操作
+            ========================================================= */
+
+            /**
+             * 指定ワールド座標 (wx, wz) が壁セルと円形衝突しているか判定
+             */
+            function isCollidingWithWall(wx, wz) {
+                const size = state.mazeSize;
+                const minGx = Math.max(0, Math.floor((wx - PLAYER_RADIUS) / CELL_SIZE));
+                const maxGx = Math.min(size - 1, Math.floor((wx + PLAYER_RADIUS) / CELL_SIZE));
+                const minGz = Math.max(0, Math.floor((wz - PLAYER_RADIUS) / CELL_SIZE));
+                const maxGz = Math.min(size - 1, Math.floor((wz + PLAYER_RADIUS) / CELL_SIZE));
+
+                for (let gz = minGz; gz <= maxGz; gz++) {
+                    for (let gx = minGx; gx <= maxGx; gx++) {
+                        if (state.grid[gz][gx] === 1) {
+                            // 壁セルのAABB矩形とプレイヤー円との最近接点距離を検査
+                            const boxMinX = gx * CELL_SIZE;
+                            const boxMaxX = boxMinX + CELL_SIZE;
+                            const boxMinZ = gz * CELL_SIZE;
+                            const boxMaxZ = boxMinZ + CELL_SIZE;
+
+                            const closestX = Math.max(boxMinX, Math.min(wx, boxMaxX));
+                            const closestZ = Math.max(boxMinZ, Math.min(wz, boxMaxZ));
+
+                            const dx = wx - closestX;
+                            const dz = wz - closestZ;
+                            if (dx * dx + dz * dz < PLAYER_RADIUS * PLAYER_RADIUS) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            /**
+             * 毎フレームのプレイヤー移動・視点更新・ゴール判定
+             */
+            function updatePlayer(dt) {
+                if (state.isCleared) return;
+
+                const k = state.keys;
+
+                // 1) 視点回転 (矢印キー または IJKL)
+                let yawDelta = 0;
+                let pitchDelta = 0;
+
+                if (k['ArrowLeft'] || k['KeyJ']) yawDelta += 1;
+                if (k['ArrowRight'] || k['KeyL']) yawDelta -= 1;
+                if (k['ArrowUp'] || k['KeyI']) pitchDelta += 1;
+                if (k['ArrowDown'] || k['KeyK']) pitchDelta -= 1;
+
+                if (yawDelta !== 0) {
+                    state.player.yaw += yawDelta * ROTATE_SPEED_YAW * dt;
+                }
+                if (pitchDelta !== 0) {
+                    state.player.pitch += pitchDelta * ROTATE_SPEED_PITCH * dt;
+                    state.player.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, state.player.pitch));
+                }
+
+                // 2) WASD 移動 (カメラの水平向き基準)
+                // yaw=0 のとき -Z(北) を向く
+                const forwardX = -Math.sin(state.player.yaw);
+                const forwardZ = -Math.cos(state.player.yaw);
+                const rightX = Math.cos(state.player.yaw);
+                const rightZ = -Math.sin(state.player.yaw);
+
+                let inputForward = 0;
+                let inputRight = 0;
+                if (k['KeyW']) inputForward += 1;
+                if (k['KeyS']) inputForward -= 1;
+                if (k['KeyD']) inputRight += 1;
+                if (k['KeyA']) inputRight -= 1;
+
+                let moveX = forwardX * inputForward + rightX * inputRight;
+                let moveZ = forwardZ * inputForward + rightZ * inputRight;
+
+                const moveLen = Math.hypot(moveX, moveZ);
+                if (moveLen > 0.0001) {
+                    // 初回移動でタイマー開始
+                    if (!state.timerStarted) {
+                        state.timerStarted = true;
+                    }
+
+                    // 斜め移動でも速度が一定になるよう正規化
+                    moveX = (moveX / moveLen) * MOVE_SPEED * dt;
+                    moveZ = (moveZ / moveLen) * MOVE_SPEED * dt;
+
+                    // X軸とZ軸を個別に衝突解決し、壁沿いに滑らかにスライド移動させる
+                    const nextX = state.player.x + moveX;
+                    if (!isCollidingWithWall(nextX, state.player.z)) {
+                        state.player.x = nextX;
+                    }
+
+                    const nextZ = state.player.z + moveZ;
+                    if (!isCollidingWithWall(state.player.x, nextZ)) {
+                        state.player.z = nextZ;
+                    }
+
+                    // 歩行時の自然な視点揺れ
+                    state.player.bobPhase += dt * 10.5;
+                } else {
+                    // 静止時は揺れを穏やかに収束
+                    state.player.bobPhase *= Math.max(0, 1 - dt * 8);
+                }
+
+                // 3) タイマー更新
+                if (state.timerStarted) {
+                    state.elapsedTime += dt;
+                }
+
+                // 4) カメラとランタンライトの位置・姿勢を同期
+                const bobOffsetY = moveLen > 0.0001 ? Math.sin(state.player.bobPhase) * 0.055 : 0;
+                camera.position.set(state.player.x, EYE_HEIGHT + bobOffsetY, state.player.z);
+                camera.rotation.y = state.player.yaw;
+                camera.rotation.x = state.player.pitch;
+
+                // ランタンライトの微細なゆらぎ
+                const flicker = 1.0 + Math.sin(performance.now() * 0.009) * 0.04;
+                playerLight.intensity = 1.85 * flicker;
+                playerLight.position.set(state.player.x, EYE_HEIGHT + 0.12 + bobOffsetY * 0.5, state.player.z);
+
+                playerForwardLight.position.set(
+                    state.player.x + forwardX * 1.4,
+                    EYE_HEIGHT - 0.1,
+                    state.player.z + forwardZ * 1.4
+                );
+
+                // 5) 探索マッピング更新
+                updateExploration();
+
+                // 6) ゴール到達判定
+                const goalPos = cellToWorld(state.goalCell.x, state.goalCell.z);
+                const distToGoal = Math.hypot(state.player.x - goalPos.x, state.player.z - goalPos.z);
+                if (distToGoal < GOAL_TRIGGER_DIST) {
+                    triggerGoalClear();
+                }
+            }
+
+            /**
+             * ゴール到達時のクリア演出とモーダル表示
+             */
+            function triggerGoalClear() {
+                state.isCleared = true;
+                playClearChime();
+
+                const percent = getExplorationPercent();
+                dom.modalTime.textContent = formatTime(state.elapsedTime);
+                dom.modalProgress.textContent = `${percent}%`;
+                dom.modalSize.textContent = `${state.mazeSize}×${state.mazeSize}`;
+                dom.clearModal.classList.add('visible');
+            }
+
+            /* =========================================================
+               6. 探索マッピング（フォグ解除）& 2D ミニマップ描画
+            ========================================================= */
+
+            /**
+             * セルを探索済みとしてマーク (level: 1=視認済み, 2=通過済み)
+             */
+            function markExplored(gx, gz, level) {
+                const size = state.mazeSize;
+                if (gx < 0 || gx >= size || gz < 0 || gz >= size) return;
+
+                const prev = state.explored[gz][gx];
+                if (level > prev) {
+                    state.explored[gz][gx] = level;
+                    // 未探索だった通路セルが初めてマッピングされたらカウント増加
+                    if (prev === 0 && state.grid[gz][gx] === 0) {
+                        state.mappedPathCells++;
+                    }
+                }
+            }
+
+            /**
+             * プレイヤーの現在マス、周囲1マス、さらに視線方向の少し先までをマッピング
+             */
+            function updateExploration() {
+                const cell = worldToCell(state.player.x, state.player.z);
+
+                // 1) 現在マスを「通過済み(2)」として記録
+                markExplored(cell.x, cell.z, 2);
+
+                // 2) 周囲8マス (隣接する壁・通路) を「視認済み(1)」として記録
+                for (let dz = -1; dz <= 1; dz++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dz === 0) continue;
+                        markExplored(cell.x + dx, cell.z + dz, 1);
+                    }
+                }
+
+                // 3) 視線方向の少し先（扇状レイキャスト最大3.2マス先）をマッピング
+                const rayCount = 9;
+                const fovSpread = 0.58; // 約 ±33度
+                const maxRayDist = CELL_SIZE * 3.2;
+                const stepDist = CELL_SIZE * 0.25;
+
+                for (let i = 0; i < rayCount; i++) {
+                    const offsetAngle = ((i / (rayCount - 1)) - 0.5) * 2 * fovSpread;
+                    const rayYaw = state.player.yaw + offsetAngle;
+                    const dirX = -Math.sin(rayYaw);
+                    const dirZ = -Math.cos(rayYaw);
+
+                    for (let d = stepDist; d <= maxRayDist; d += stepDist) {
+                        const rx = state.player.x + dirX * d;
+                        const rz = state.player.z + dirZ * d;
+                        const rc = worldToCell(rx, rz);
+
+                        if (rc.x < 0 || rc.x >= state.mazeSize || rc.z < 0 || rc.z >= state.mazeSize) {
+                            break;
+                        }
+
+                        markExplored(rc.x, rc.z, 1);
+
+                        // 壁に当たったらその壁をマッピングしてレイ終了
+                        if (state.grid[rc.z][rc.x] === 1) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            function getExplorationPercent() {
+                if (state.totalPathCells <= 0) return 0;
+                return Math.min(100, Math.round((state.mappedPathCells / state.totalPathCells) * 100));
+            }
+
+            /**
+             * ミニマップCanvasの高DPIリサイズ対応
+             */
+            function resizeMinimapCanvas() {
+                const rect = dom.minimapCanvas.getBoundingClientRect();
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                const w = Math.max(120, Math.round(rect.width * dpr));
+                const h = Math.max(120, Math.round(rect.height * dpr));
+                if (dom.minimapCanvas.width !== w || dom.minimapCanvas.height !== h) {
+                    dom.minimapCanvas.width = w;
+                    dom.minimapCanvas.height = h;
+                }
+                dom.minimapCtx = dom.minimapCanvas.getContext('2d');
+            }
+
+            /**
+             * 探索済み領域・スタート・ゴール・プレイヤー視界コーンをミニマップに描画
+             */
+            function renderMinimap() {
+                const ctx = dom.minimapCtx;
+                if (!ctx) return;
+
+                const width = dom.minimapCanvas.width;
+                const height = dom.minimapCanvas.height;
+                const size = state.mazeSize;
+                const pad = width * 0.04;
+                const drawSize = width - pad * 2;
+                const cellPx = drawSize / size;
+
+                // 1) 未探索フォグ背景
+                ctx.fillStyle = '#050810';
+                ctx.fillRect(0, 0, width, height);
+
+                // 微細なグリッド線（未探索エリアの雰囲気用）
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.04)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= size; i++) {
+                    const p = pad + i * cellPx;
+                    ctx.beginPath();
+                    ctx.moveTo(p, pad);
+                    ctx.lineTo(p, pad + drawSize);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(pad, p);
+                    ctx.lineTo(pad + drawSize, p);
+                    ctx.stroke();
+                }
+
+                // 2) 探索済みマスの描画
+                for (let z = 0; z < size; z++) {
+                    for (let x = 0; x < size; x++) {
+                        const exp = state.explored[z][x];
+                        if (exp === 0) continue; // 未探索は非表示
+
+                        const px = pad + x * cellPx;
+                        const py = pad + z * cellPx;
+
+                        if (state.grid[z][x] === 1) {
+                            // 発見済みの壁
+                            ctx.fillStyle = '#334155';
+                            ctx.fillRect(px, py, cellPx + 0.5, cellPx + 0.5);
+                            ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+                            ctx.lineWidth = 0.75;
+                            ctx.strokeRect(px + 0.5, py + 0.5, cellPx - 1, cellPx - 1);
+                        } else {
+                            // 探索済みの通路 (通過済みは少し明るく、視認のみはやや落ち着いた色)
+                            ctx.fillStyle = exp === 2 ? '#1e293b' : '#131c2e';
+                            ctx.fillRect(px, py, cellPx + 0.5, cellPx + 0.5);
+                        }
+                    }
+                }
+
+                // 3) スタート地点マーカー
+                const sx = pad + (state.startCell.x + 0.5) * cellPx;
+                const sy = pad + (state.startCell.z + 0.5) * cellPx;
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+                ctx.beginPath();
+                ctx.arc(sx, sy, cellPx * 0.42, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(sx, sy, cellPx * 0.22, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 4) ゴール地点マーカー (発見済みの場合のみ表示)
+                if (state.explored[state.goalCell.z][state.goalCell.x] > 0) {
+                    const gx = pad + (state.goalCell.x + 0.5) * cellPx;
+                    const gy = pad + (state.goalCell.z + 0.5) * cellPx;
+                    const pulse = 0.8 + Math.sin(performance.now() * 0.006) * 0.2;
+
+                    ctx.fillStyle = `rgba(16, 185, 129, ${0.35 * pulse})`;
+                    ctx.beginPath();
+                    ctx.arc(gx, gy, cellPx * 0.52 * pulse, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // ひし形クリスタルアイコン
+                    const r = cellPx * 0.34;
+                    ctx.fillStyle = '#34d399';
+                    ctx.beginPath();
+                    ctx.moveTo(gx, gy - r);
+                    ctx.lineTo(gx + r * 0.8, gy);
+                    ctx.lineTo(gx, gy + r);
+                    ctx.lineTo(gx - r * 0.8, gy);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // 5) プレイヤーの現在地・視界コーン・向き矢印
+                const px = pad + (state.player.x / CELL_SIZE) * cellPx;
+                const py = pad + (state.player.z / CELL_SIZE) * cellPx;
+                const dirX = -Math.sin(state.player.yaw);
+                const dirZ = -Math.cos(state.player.yaw);
+                const mapAngle = Math.atan2(dirZ, dirX);
+
+                // 視界コーン (半透明グラデーション)
+                const coneRadius = cellPx * 2.1;
+                const coneSpread = 0.52;
+                const coneGrad = ctx.createRadialGradient(px, py, 1, px, py, coneRadius);
+                coneGrad.addColorStop(0, 'rgba(245, 158, 11, 0.48)');
+                coneGrad.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+                ctx.fillStyle = coneGrad;
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.arc(px, py, coneRadius, mapAngle - coneSpread, mapAngle + coneSpread);
+                ctx.closePath();
+                ctx.fill();
+
+                // プレイヤーの向きを示す矢印型マーカー
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(mapAngle);
+                const arrowLen = Math.max(5.5, cellPx * 0.42);
+                const arrowW = Math.max(4.0, cellPx * 0.3);
+
+                ctx.fillStyle = '#fbbf24';
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(arrowLen, 0);
+                ctx.lineTo(-arrowLen * 0.72, -arrowW);
+                ctx.lineTo(-arrowLen * 0.35, 0);
+                ctx.lineTo(-arrowLen * 0.72, arrowW);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            /**
+             * 左上 HUD とコンパス方位表示を更新
+             */
+            function updateHUD() {
+                dom.hudTimer.textContent = formatTime(state.elapsedTime);
+
+                const percent = getExplorationPercent();
+                dom.hudProgress.textContent = `${percent}%`;
+                dom.hudProgressBar.style.width = `${percent}%`;
+
+                // 8方位コンパス計算 (yaw=0 が北 -Z)
+                const dirX = -Math.sin(state.player.yaw);
+                const dirZ = -Math.cos(state.player.yaw);
+                const angleDeg = ((Math.atan2(dirX, -dirZ) * 180) / Math.PI + 360) % 360;
+                const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+                const dirIdx = Math.round(angleDeg / 45) % 8;
+                dom.compassDir.textContent = dirs[dirIdx];
+            }
+
+            /* =========================================================
+               7. イベントリスナー登録 (キーボード・マウス・タッチ・UI)
+            ========================================================= */
+
+            function toggleMinimapSize() {
+                state.isMinimapExpanded = !state.isMinimapExpanded;
+                dom.minimapWrapper.classList.toggle('expanded', state.isMinimapExpanded);
+                dom.btnToggleMap.textContent = state.isMinimapExpanded ? '縮小 [M]' : '拡大 [M]';
+
+                // CSSトランジション中に段階的にCanvas解像度を再調整
+                setTimeout(resizeMinimapCanvas, 120);
+                setTimeout(resizeMinimapCanvas, 280);
+            }
+
+            function bindEvents() {
+                // キー押下
+                window.addEventListener('keydown', (e) => {
+                    // 矢印キーやスペースキーによるブラウザスクロールを防止
+                    if (
+                        e.code === 'ArrowUp' ||
+                        e.code === 'ArrowDown' ||
+                        e.code === 'ArrowLeft' ||
+                        e.code === 'ArrowRight' ||
+                        e.code === 'Space'
+                    ) {
+                        e.preventDefault();
+                    }
+
+                    // Mキーでミニマップ拡大縮小トグル (リピート防止)
+                    if (e.code === 'KeyM' && !e.repeat) {
+                        toggleMinimapSize();
+                        return;
+                    }
+
+                    state.keys[e.code] = true;
+                }, { passive: false });
+
+                // キー離上
+                window.addEventListener('keyup', (e) => {
+                    state.keys[e.code] = false;
+                });
+
+                // ウィンドウからフォーカスが外れたら入力状態をクリア
+                window.addEventListener('blur', () => {
+                    state.keys = Object.create(null);
+                    state.pointerLook.active = false;
+                });
+
+                // マウスドラッグによる補助的な視点移動
+                dom.container.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0 || state.isCleared) return;
+                    state.pointerLook.active = true;
+                    state.pointerLook.lastX = e.clientX;
+                    state.pointerLook.lastY = e.clientY;
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!state.pointerLook.active || state.isCleared) return;
+                    const dx = e.clientX - state.pointerLook.lastX;
+                    const dy = e.clientY - state.pointerLook.lastY;
+                    state.pointerLook.lastX = e.clientX;
+                    state.pointerLook.lastY = e.clientY;
+
+                    state.player.yaw -= dx * 0.0045;
+                    state.player.pitch -= dy * 0.0038;
+                    state.player.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, state.player.pitch));
+                });
+
+                window.addEventListener('mouseup', () => {
+                    state.pointerLook.active = false;
+                });
+
+                // タッチスワイプによる視点移動 (キャンバス上)
+                dom.container.addEventListener('touchstart', (e) => {
+                    if (e.touches.length === 1 && !state.isCleared) {
+                        state.pointerLook.active = true;
+                        state.pointerLook.lastX = e.touches[0].clientX;
+                        state.pointerLook.lastY = e.touches[0].clientY;
+                    }
+                }, { passive: true });
+
+                dom.container.addEventListener('touchmove', (e) => {
+                    if (!state.pointerLook.active || e.touches.length !== 1 || state.isCleared) return;
+                    const dx = e.touches[0].clientX - state.pointerLook.lastX;
+                    const dy = e.touches[0].clientY - state.pointerLook.lastY;
+                    state.pointerLook.lastX = e.touches[0].clientX;
+                    state.pointerLook.lastY = e.touches[0].clientY;
+
+                    state.player.yaw -= dx * 0.0055;
+                    state.player.pitch -= dy * 0.0045;
+                    state.player.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, state.player.pitch));
+                }, { passive: true });
+
+                dom.container.addEventListener('touchend', () => {
+                    state.pointerLook.active = false;
+                });
+
+                // モバイル用バーチャルボタン
+                document.querySelectorAll('.touch-btn').forEach((btn) => {
+                    const keyCode = btn.dataset.key;
+                    const press = (e) => {
+                        e.preventDefault();
+                        state.keys[keyCode] = true;
+                        btn.classList.add('pressed');
+                    };
+                    const release = (e) => {
+                        e.preventDefault();
+                        state.keys[keyCode] = false;
+                        btn.classList.remove('pressed');
+                    };
+                    btn.addEventListener('touchstart', press, { passive: false });
+                    btn.addEventListener('touchend', release, { passive: false });
+                    btn.addEventListener('touchcancel', release, { passive: false });
+                    btn.addEventListener('mousedown', press);
+                    btn.addEventListener('mouseup', release);
+                    btn.addEventListener('mouseleave', release);
+                });
+
+                // 迷路サイズ切替ボタン
+                dom.sizeButtons.forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        const chosenSize = Number(btn.dataset.size);
+                        btn.blur();
+                        startNewMaze(chosenSize);
+                    });
+                });
+
+                // 新しい迷路ボタン
+                dom.btnNewMaze.addEventListener('click', () => {
+                    dom.btnNewMaze.blur();
+                    startNewMaze(state.mazeSize);
+                });
+
+                // ミニマップ拡大縮小ボタン
+                dom.btnToggleMap.addEventListener('click', () => {
+                    dom.btnToggleMap.blur();
+                    toggleMinimapSize();
+                });
+
+                // クリアモーダルの「もう一度プレイ」ボタン
+                dom.btnPlayAgain.addEventListener('click', () => {
+                    dom.btnPlayAgain.blur();
+                    startNewMaze(state.mazeSize);
+                });
+
+                // ウィンドウリサイズ対応
+                window.addEventListener('resize', () => {
+                    if (!camera || !renderer) return;
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    resizeMinimapCanvas();
+                });
+            }
+
+            /* =========================================================
+               8. メインアニメーションループ
+            ========================================================= */
+
+            function animate(now) {
+                requestAnimationFrame(animate);
+
+                const dt = Math.min((now - lastFrameTime) / 1000, 0.08); // 極端なフレーム飛びをクランプ
+                lastFrameTime = now;
+
+                // プレイヤー移動・視点・探索更新
+                updatePlayer(dt);
+
+                // ゴールクリスタルとビーコンの浮遊・回転アニメーション
+                if (goalElements) {
+                    const t = now * 0.001;
+                    goalElements.crystal.rotation.y = t * 1.4;
+                    goalElements.crystal.rotation.x = Math.sin(t * 1.1) * 0.25;
+                    goalElements.crystal.position.y = 1.75 + Math.sin(t * 2.4) * 0.16;
+
+                    goalElements.halo.rotation.x = Math.PI / 2 + Math.sin(t * 1.3) * 0.45;
+                    goalElements.halo.rotation.y = t * 0.9;
+                    goalElements.halo.position.y = goalElements.crystal.position.y;
+
+                    goalElements.beacon.material.opacity = 0.13 + Math.sin(t * 3.0) * 0.04;
+                    goalElements.goalLight.intensity = 2.4 + Math.sin(t * 3.2) * 0.45;
+                }
+
+                // 3Dシーンとミニマップ・HUDを描画
+                renderer.render(scene, camera);
+                renderMinimap();
+                updateHUD();
+            }
+
+            /* =========================================================
+               初期化エントリーポイント (window.onload)
+            ========================================================= */
+            window.onload = function () {
+                try {
+                    initThree();
+                    bindEvents();
+                    startNewMaze(15);
+                    lastFrameTime = performance.now();
+                    requestAnimationFrame(animate);
+                } catch (err) {
+                    console.error('ゲームの初期化中にエラーが発生しました:', err);
+                    showToast('WebGLの初期化に失敗しました。ブラウザ設定をご確認ください。');
+                }
+            };
+        })();
+    </script>
+</body>
+</html>
